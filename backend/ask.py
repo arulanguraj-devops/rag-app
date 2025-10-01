@@ -144,15 +144,16 @@ def generate(query, datastore_key, chat_history):
 
 IMPORTANT INSTRUCTIONS:
 - Use the provided numbered references [1], [2], [3], etc. in your response to cite information
-- When referencing information from the context, include the citation number like [1] or [2] immediately after the relevant statement
+- CRITICAL: Include citation numbers [1] or [2] IMMEDIATELY after each piece of information from the references
+- DO NOT put all citations at the end - place them right after the relevant content
+- Example: "The holiday is on 14.01.2025 [1] and falls on Tuesday [2]."
 - If you don't know the answer, say "I regret to inform you that I am unable to provide a specific answer at this time, as this information is not available to me."
 - Format your response clearly using markdown for better readability
-- For tabular data, create well-formatted tables with appropriate columns
+- For tabular data, create well-formatted tables with appropriate columns and include citations for each row
 - When asked for complete or full information, include ALL relevant data mentioned in the references
-- For lists, use proper bullet points or numbered lists
+- For lists, use proper bullet points or numbered lists with citations after each item
 - Be concise and well-organized in your responses
 - Focus on the most relevant information from the context
-- ALWAYS include citation numbers [1], [2], etc. when using information from the numbered references below
 - Make sure to compile information from ALL relevant references to provide complete answers
 
 NUMBERED REFERENCES:

@@ -11,7 +11,8 @@ const ChatArea = ({
   apiKey, 
   isApiKeyValid,
   datastoreKey,
-  appConfig 
+  appConfig,
+  onCitationClick 
 }) => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -221,6 +222,7 @@ const ChatArea = ({
             key={message.id} 
             message={message} 
             isTyping={message.type === 'typing'}
+            onCitationClick={onCitationClick}
           />
         ))}
 

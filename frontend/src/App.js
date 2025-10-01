@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import SettingsModal from './components/SettingsModal';
+import DocumentViewer from './components/DocumentViewer';
 import { 
   getConversations, 
   createNewConversation, 
@@ -21,6 +22,7 @@ function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(window.innerWidth < 1024);
   const [appConfig, setAppConfig] = useState(null);
   const [isConfigLoading, setIsConfigLoading] = useState(true);
+  const [selectedDocument, setSelectedDocument] = useState(null);
 
   // Load initial data
   useEffect(() => {
@@ -185,8 +187,24 @@ function App() {
     }
   };
 
-  const handleToggleSidebar = (collapsed) => {
-    setIsSidebarCollapsed(collapsed);
+    const handleToggleSidebar = () => {
+    setIsSidebarCollapsed(!isSidebarCollapsed);
+  };
+
+  // Handle citation clicks from messages
+  const handleCitationClick = (documentData) => {
+    console.log('App received citation click:', documentData);
+    setSelectedDocument(documentData);
+  };
+
+  // Close document viewer
+  const handleCloseDocument = () => {
+    // Clean up blob URL if it exists to prevent memory leaks
+    if (selectedDocument?.isBlob && selectedDocument?.viewerUrl) {
+      console.log('Cleaning up blob URL:', selectedDocument.viewerUrl);
+      URL.revokeObjectURL(selectedDocument.viewerUrl);
+    }
+    setSelectedDocument(null);
   };
 
   // Show loading screen while configuration is loading
@@ -225,8 +243,17 @@ function App() {
           isApiKeyValid={isApiKeyValid}
           datastoreKey={settings.datastore_key}
           appConfig={appConfig}
+          onCitationClick={handleCitationClick}
         />
       </div>
+      
+      {/* Document Viewer Sidebar */}
+      {selectedDocument && (
+        <DocumentViewer
+          document={selectedDocument}
+          onClose={handleCloseDocument}
+        />
+      )}
       
       {appConfig.features.settings_enabled && (
         <SettingsModal
