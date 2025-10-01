@@ -1,0 +1,37 @@
+{
+  "app": {
+    "name": "Ventech Assistant",
+    "description": "AI-powered HR policy assistant ready to help",
+    "welcome_title": "Welcome to Ventech Assistant",
+    "welcome_message": "Ask me anything about HR and IT polices related topics. I'm here to help with evidence-based information.",
+    "company": "VentechSolutions",
+    "company_logo_url": "https://qurhealth.com/wp-content/uploads/2022/02/QurHealth_Logo.png",
+    "chatbot_logo_url": "https://qurhealth.com/wp-content/uploads/2022/02/QurHealth_Logo.png"
+  },
+  "features": {
+    "settings_enabled": true,
+    "api_key_required": true,
+    "datastore_selection_enabled": false,
+    "chat_history_enabled": true,
+    "conversation_management_enabled": true,
+    "theme_selection_enabled": true,
+    "logo_customization_enabled": true
+  },
+  "defaults": {
+    "datastore_key": "test",
+    "theme": "light",
+    "max_conversations": 50,
+    "max_chat_history": 10
+  },
+  "ui": {
+    "sidebar_collapsible": true,
+    "show_conversation_timestamps": true,
+    "show_message_timestamps": false,
+    "auto_scroll": true
+  },
+  "api": {
+    "cors_origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+    "max_query_length": 1000,
+    "rate_limit_enabled": false
+  }
+}

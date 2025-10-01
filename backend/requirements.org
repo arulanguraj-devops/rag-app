@@ -1,0 +1,1 @@
+langchain_openai langchain_chroma langchain fastapi pydantic langchain_community
