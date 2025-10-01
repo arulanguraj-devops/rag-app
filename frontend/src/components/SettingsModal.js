@@ -1,19 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, TestTube, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import { getSettings, saveSettings } from '../utils/storage';
+import { X, Save, TestTube, CheckCircle, XCircle, Loader2, Trash2 } from 'lucide-react';
+import { getSettings, saveSettings, clearAllConversations } from '../utils/storage';
 import { testApiConnection } from '../utils/api';
 
 const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
   const [settings, setSettings] = useState({
     apiKey: '',
     datastore_key: 'test',
-    theme: 'light',
-    company_logo_url: '',
-    chatbot_logo_url: ''
+    theme: 'light'
   });
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -21,9 +20,7 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
       const mergedSettings = {
         apiKey: currentSettings.apiKey || '',
         datastore_key: currentSettings.datastore_key || appConfig?.defaults?.datastore_key || 'test',
-        theme: currentSettings.theme || appConfig?.defaults?.theme || 'light',
-        company_logo_url: currentSettings.company_logo_url || appConfig?.app?.company_logo_url || '',
-        chatbot_logo_url: currentSettings.chatbot_logo_url || appConfig?.app?.chatbot_logo_url || ''
+        theme: currentSettings.theme || appConfig?.defaults?.theme || 'light'
       };
       setSettings(mergedSettings);
       setConnectionStatus(null);
@@ -76,18 +73,6 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
       });
       
       if (success) {
-        // Update favicon if chatbot logo URL changed
-        if (settings.chatbot_logo_url && settings.chatbot_logo_url.trim()) {
-          const favicon = document.querySelector('link[rel="icon"]') || document.createElement('link');
-          favicon.rel = 'icon';
-          favicon.href = settings.chatbot_logo_url.trim();
-          
-          // If the link doesn't exist in the document, add it
-          if (!document.querySelector('link[rel="icon"]')) {
-            document.head.appendChild(favicon);
-          }
-        }
-        
         onSettingsUpdate(settings);
         onClose();
       } else {
@@ -98,6 +83,22 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
       alert('Failed to save settings. Please try again.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleClearHistory = () => {
+    try {
+      const success = clearAllConversations();
+      if (success) {
+        setShowClearConfirm(false);
+        // Force a page reload to reset the conversation state
+        window.location.reload();
+      } else {
+        alert('Failed to clear chat history. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error clearing chat history:', error);
+      alert('Failed to clear chat history. Please try again.');
     }
   };
 
@@ -214,43 +215,52 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
             </div>
           )}
 
-          {/* Logo Configuration */}
-          {appConfig?.features?.logo_customization_enabled && (
+          {/* Chat History Management */}
+          {appConfig?.features?.chat_history_enabled && (
             <div className="space-y-4">
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Logo Configuration</h3>
+              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Chat History</h3>
               
-              {/* Company Logo URL */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Company Logo URL
-                </label>
-                <input
-                  type="url"
-                  value={settings.company_logo_url}
-                  onChange={(e) => handleInputChange('company_logo_url', e.target.value)}
-                  placeholder="https://example.com/logo.png"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Logo displayed in the sidebar (leave empty for default)
-                </p>
-              </div>
-
-              {/* Chatbot Logo URL */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Chatbot Logo URL
-                </label>
-                <input
-                  type="url"
-                  value={settings.chatbot_logo_url}
-                  onChange={(e) => handleInputChange('chatbot_logo_url', e.target.value)}
-                  placeholder="https://example.com/bot-avatar.png"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Logo displayed in the welcome message (leave empty for emoji)
-                </p>
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <Trash2 size={20} className="text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-1">
+                      Clear All Chat History
+                    </h4>
+                    <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-3">
+                      This will permanently delete all conversations and messages stored in your browser. This action cannot be undone.
+                    </p>
+                    
+                    {!showClearConfirm ? (
+                      <button
+                        onClick={() => setShowClearConfirm(true)}
+                        className="px-3 py-2 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+                      >
+                        Clear All History
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                          Are you sure? This cannot be undone.
+                        </p>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={handleClearHistory}
+                            className="px-3 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                          >
+                            Yes, Clear All
+                          </button>
+                          <button
+                            onClick={() => setShowClearConfirm(false)}
+                            className="px-3 py-2 text-sm bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}

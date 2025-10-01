@@ -14,8 +14,7 @@
     "datastore_selection_enabled": false,
     "chat_history_enabled": true,
     "conversation_management_enabled": true,
-    "theme_selection_enabled": true,
-    "logo_customization_enabled": true
+    "theme_selection_enabled": true
   },
   "defaults": {
     "datastore_key": "test",
