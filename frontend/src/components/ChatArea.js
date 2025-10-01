@@ -17,12 +17,18 @@ const ChatArea = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [currentResponse, setCurrentResponse] = useState('');
+  const [currentCitations, setCurrentCitations] = useState([]);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
 
   // Load messages when conversation changes
   useEffect(() => {
     if (conversation?.messages) {
+      console.log('Loading messages:', conversation.messages.map(m => ({ 
+        id: m.id, 
+        type: m.type, 
+        citationsCount: m.citations ? m.citations.length : 0 
+      })));
       setMessages(conversation.messages);
       setError(null);
     } else {
@@ -61,6 +67,7 @@ const ChatArea = ({
     setIsLoading(true);
     setIsTyping(true);
     setCurrentResponse('');
+    setCurrentCitations([]);
 
     // Prepare chat history for API (configurable length)
     const maxChatHistory = appConfig?.defaults?.max_chat_history || 10;
@@ -70,6 +77,7 @@ const ChatArea = ({
     })).filter(item => item.user || item.bot);
 
     let botResponseContent = '';
+    let collectedCitations = [];
 
     try {
       await streamChatResponse(
@@ -92,8 +100,11 @@ const ChatArea = ({
               id: Date.now() + 1,
               type: 'bot',
               content: botResponseContent.trim(),
+              citations: collectedCitations,
               timestamp: new Date().toISOString()
             };
+
+            console.log('Saving bot message with citations:', botMessage);
 
             const finalConversation = addMessageToConversation(conversation.id, botMessage);
             if (finalConversation) {
@@ -102,13 +113,16 @@ const ChatArea = ({
             }
           }
           
+          // Clear temporary state
           setCurrentResponse('');
+          setCurrentCitations([]);
         },
         // onError
         (error) => {
           setIsTyping(false);
           setIsLoading(false);
           setCurrentResponse('');
+          setCurrentCitations([]);
           
           let errorMessage = 'An unexpected error occurred. Please try again.';
           
@@ -119,20 +133,27 @@ const ChatArea = ({
               errorMessage = 'Rate limit exceeded. Please wait a moment before trying again.';
             } else if (error.status >= 500) {
               errorMessage = 'Server error. Please try again later.';
-            } else {
-              errorMessage = error.message;
             }
-          } else if (error.message.includes('fetch')) {
-            errorMessage = 'Cannot connect to the server. Please check if the backend is running.';
           }
           
           setError(errorMessage);
+          
+          setTimeout(() => {
+            setError(null);
+          }, 5000);
+        },
+        // onCitations
+        (citations) => {
+          console.log('Received citations:', citations);
+          collectedCitations = citations;
+          setCurrentCitations(citations);
         }
       );
     } catch (error) {
       setIsTyping(false);
       setIsLoading(false);
       setCurrentResponse('');
+      setCurrentCitations([]);
       setError('Failed to send message. Please try again.');
       console.error('Chat error:', error);
     }
@@ -147,6 +168,7 @@ const ChatArea = ({
         id: 'typing',
         type: 'bot',
         content: currentResponse,
+        citations: currentCitations, // Include current citations in typing indicator
         timestamp: new Date().toISOString()
       });
     } else {

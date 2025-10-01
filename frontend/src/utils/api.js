@@ -10,7 +10,7 @@ export class APIError extends Error {
   }
 }
 
-export const streamChatResponse = async (query, datastore_key, chat_history, apiKey, onMessage, onComplete, onError) => {
+export const streamChatResponse = async (query, datastore_key, chat_history, apiKey, onMessage, onComplete, onError, onCitations = () => {}) => {
   try {
     const response = await fetch(`${API_BASE_URL}/ask`, {
       method: 'POST',
@@ -53,11 +53,19 @@ export const streamChatResponse = async (query, datastore_key, chat_history, api
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.substring(6));
-              if (data.data) {
+              
+              // Handle different types of data
+              if (data.type === 'token' && data.data) {
+                onMessage(data.data);
+              } else if (data.type === 'citations' && data.data) {
+                console.log('Received citations from backend:', data.data);
+                onCitations(data.data);
+              } else if (data.data) {
+                // Backward compatibility for old format
                 onMessage(data.data);
               }
             } catch (parseError) {
-              console.error('Error parsing SSE data:', parseError);
+              console.error('Error parsing SSE data:', parseError, 'Line:', line);
             }
           }
         }

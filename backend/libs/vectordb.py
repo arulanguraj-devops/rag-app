@@ -72,13 +72,65 @@ def upload_document(file_path: str, brain_folder: str):
 
     # Load and split documents
     documents = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000, 
-        chunk_overlap=100,
-        length_function=len,
-        separators=["\n\n", "\n", ",", " ", ""]
-    )
-    split_docs = text_splitter.split_documents(documents)
+    
+    # For CSV files, combine all rows into a single document to avoid multiple references
+    if file_extension.lower() == ".csv":
+        if len(documents) > 1:
+            # Combine all CSV rows into a single document
+            combined_content = "\n".join([doc.page_content for doc in documents])
+            # Create a single document with combined content
+            from langchain.schema import Document
+            combined_doc = Document(
+                page_content=combined_content,
+                metadata=documents[0].metadata  # Use metadata from first document
+            )
+            documents = [combined_doc]
+        split_docs = documents  # Don't split CSV files
+    else:
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000, 
+            chunk_overlap=100,
+            length_function=len,
+            separators=["\n\n", "\n", ",", " ", ""]
+        )
+        split_docs = text_splitter.split_documents(documents)
+
+    # Enhanced metadata for each document chunk
+    for i, doc in enumerate(split_docs):
+        # Get the filename for title
+        filename = os.path.basename(file_path)
+        title = os.path.splitext(filename)[0]
+        
+        # Add comprehensive metadata
+        doc.metadata.update({
+            "source": file_path,
+            "title": title,
+            "filename": filename,
+            "file_extension": file_extension,
+            "chunk_index": i,
+            "brain_folder": brain_folder
+        })
+        
+        # Add page number for PDFs if available
+        if file_extension.lower() == ".pdf" and hasattr(doc, 'metadata') and 'page' in doc.metadata:
+            # PyPDFLoader already provides page metadata
+            pass
+        elif file_extension.lower() == ".pdf":
+            # Estimate page number based on chunk size (rough approximation)
+            estimated_page = (i // 3) + 1  # Assuming ~3 chunks per page
+            doc.metadata["page"] = estimated_page
+        
+        # For CSV files, don't assign page numbers
+        elif file_extension.lower() == ".csv":
+            # CSV files don't have pages, remove any page metadata
+            if 'page' in doc.metadata:
+                del doc.metadata['page']
+            if 'row' in doc.metadata:
+                del doc.metadata['row']
+        
+        # For other file types, use chunk index as page reference
+        else:
+            doc.metadata["page"] = i + 1
 
     # Initialize Chroma vector store
     persist_dir = "chroma_data"
@@ -101,11 +153,8 @@ def upload_document(file_path: str, brain_folder: str):
         logging.error(f"The file hash has changed for {file_path}. Please delete the ChromaDB folder {datastore_path} and {hash_store_path}, then try again.")
         sys.exit("Exiting the application due to hash change.")
 
-    # Add documents to vector store
-    vectorstore.add_documents(
-        documents=split_docs, 
-        metadata={"file_path": file_path}
-    )
+    # Add documents to vector store with enhanced metadata
+    vectorstore.add_documents(documents=split_docs)
 
     # Save updated hash
     file_hashes[file_path] = current_file_hash

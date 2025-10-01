@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Header, Depends
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
@@ -59,18 +59,73 @@ def get_vectorstore(datastore_key: str):
     datastore_path = os.path.join(persist_dir, datastore_key)
     return Chroma(embedding_function=embeddings, persist_directory=datastore_path)
 
-# Generate function with Chroma retrieval
 def generate(query, datastore_key, chat_history):  
     logging.debug(f"Starting generation for query: {query} with datastore_key: {datastore_key}")
     vectorstore = get_vectorstore(datastore_key)
     
-    # Retrieve similar documents using similarity_search
-    similar_documents = vectorstore.similarity_search(query, k=5)
+    # Retrieve more documents initially, then filter by relevance
+    k_value = 10  # Get more results initially for better filtering
+    
+    # Retrieve similar documents using similarity_search_with_score for better relevance
+    similar_documents_with_scores = vectorstore.similarity_search_with_score(query, k=k_value)
+    similar_documents = [doc for doc, score in similar_documents_with_scores]
     logging.debug(f"Found {len(similar_documents)} similar documents")
+    
+    # Collect citation information
+    citations = []
+    for i, (doc, score) in enumerate(similar_documents_with_scores):
+        # Use a more selective relevance threshold to filter out irrelevant documents
+        # Lower scores are better (closer similarity)
+        relevance_threshold = 0.55  # More selective threshold
+        
+        # Skip documents that are not relevant enough
+        if score > relevance_threshold:
+            logging.info(f"Skipping irrelevant document: {doc.metadata.get('title', 'Unknown')} (Score: {score:.3f})")
+            continue
+            
+        # Handle both old and new metadata formats
+        source = doc.metadata.get('source', doc.metadata.get('file_path', 'Unknown'))
+        title = doc.metadata.get('title', os.path.basename(source) if source != 'Unknown' else 'Unknown Document')
+        page = doc.metadata.get('page', None)
+        
+        # Clean up the source path for display
+        if source.startswith('./') or source.startswith('.\\'):
+            source = source[2:]
+        
+        # For CSV files, don't show page numbers as they don't have pages
+        if source.lower().endswith('.csv'):
+            page = None
+        
+        # Create the document URL for the frontend
+        document_url = f"http://127.0.0.1:8000/documents/{source}" if source != 'Unknown' else None
+        
+        citation = {
+            "id": f"ref_{len(citations)+1}",  # Use actual citation count
+            "source": document_url,
+            "local_path": source,  # Keep the local path for reference
+            "page": page,
+            "title": title,
+            "relevance_score": float(score),
+            "content_preview": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
+        }
+        citations.append(citation)
+    
+    # Filter similar_documents to match the filtered citations
+    filtered_documents = [doc for doc, score in similar_documents_with_scores 
+                         if score <= 0.55]
+    
+    # Set citations in the stream handler
+    stream_handler.set_citations(citations)
+    
+    # Debug: Log the citations being sent
+    logging.info(f"Generated {len(citations)} citations:")
+    for citation in citations:
+        logging.info(f"  Citation: {citation['id']} - {citation['title']} (Score: {citation['relevance_score']:.3f})")
     
     # Log the content of retrieved documents for debugging
     for i, doc in enumerate(similar_documents):
         logging.debug(f"Document {i+1} content preview: {doc.page_content[:200]}...")
+        logging.debug(f"Document {i+1} metadata: {doc.metadata}")
 
     if not similar_documents:
         # Handle case where no documents are found
@@ -78,24 +133,30 @@ def generate(query, datastore_key, chat_history):
         streamer_queue.put("No relevant documents found.")
         return
     
-    # Prepare context for LLM
-    context = "\n".join(doc.page_content for doc in similar_documents)
+    # Prepare context for LLM with numbered references
+    context_with_citations = ""
+    for i, doc in enumerate(filtered_documents):
+        context_with_citations += f"[{i+1}] {doc.page_content}\n\n"
     
     # Create the prompt including chat history
     chat_context = "\n".join(f"User: {msg['user']}\nBot: {msg['bot']}" for msg in chat_history)
     prompt = f"""You are QurHealth Assistant, a helpful AI healthcare assistant. 
 
 IMPORTANT INSTRUCTIONS:
+- Use the provided numbered references [1], [2], [3], etc. in your response to cite information
+- When referencing information from the context, include the citation number like [1] or [2] immediately after the relevant statement
 - If you don't know the answer, say "I regret to inform you that I am unable to provide a specific answer at this time, as this information is not available to me."
 - Format your response clearly using markdown for better readability
-- For holiday lists or date information, create a well-formatted table with columns like: Holiday Name, Date, Day, Location
+- For tabular data, create well-formatted tables with appropriate columns
+- When asked for complete or full information, include ALL relevant data mentioned in the references
 - For lists, use proper bullet points or numbered lists
 - Be concise and well-organized in your responses
 - Focus on the most relevant information from the context
-- If showing holiday information, format dates clearly (DD.MM.YYYY format)
+- ALWAYS include citation numbers [1], [2], etc. when using information from the numbered references below
+- Make sure to compile information from ALL relevant references to provide complete answers
 
-CONTEXT:
-{context}
+NUMBERED REFERENCES:
+{context_with_citations}
 
 CHAT HISTORY:
 {chat_context}
@@ -120,10 +181,19 @@ async def response_generator(query, datastore_key, chat_history):
         value = await asyncio.to_thread(streamer_queue.get)
         if value is None:  
             break
-        response_data = {
-            "data": value
-        }  
-        yield f"data: {json.dumps(response_data)}\n\n"  
+        
+        # Handle citations separately
+        if isinstance(value, dict) and value.get("type") == "citations":
+            # Citation data is already in the correct format
+            yield f"data: {json.dumps(value)}\n\n"
+        elif isinstance(value, str):
+            # Regular text token
+            response_data = {
+                "type": "token",
+                "data": value
+            }  
+            yield f"data: {json.dumps(response_data)}\n\n"
+            
         streamer_queue.task_done()
         await asyncio.sleep(0.1)
 
@@ -151,6 +221,52 @@ async def get_config():
     except Exception as e:
         logging.error(f"Error retrieving configuration: {e}")
         raise HTTPException(status_code=500, detail="Error retrieving configuration")
+
+@app.get('/documents/{file_path:path}')
+async def serve_document(file_path: str):
+    """Serve documents for citation viewing"""
+    try:
+        # Ensure the file path is safe and within the data directory
+        safe_path = os.path.normpath(file_path)
+        
+        # Remove any leading slashes or dots to prevent directory traversal
+        safe_path = safe_path.lstrip('./')
+        
+        # Construct the full path
+        full_path = os.path.join(os.getcwd(), safe_path)
+        
+        # Verify the file exists and is within allowed directories
+        if not os.path.exists(full_path):
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        # Security check: ensure the file is within the data directory
+        data_dir = os.path.join(os.getcwd(), "data")
+        if not os.path.commonpath([full_path, data_dir]) == data_dir:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Determine the media type based on file extension
+        file_extension = os.path.splitext(full_path)[1].lower()
+        media_type_map = {
+            '.pdf': 'application/pdf',
+            '.csv': 'text/csv',
+            '.txt': 'text/plain',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.doc': 'application/msword',
+            '.html': 'text/html',
+            '.json': 'application/json'
+        }
+        
+        media_type = media_type_map.get(file_extension, 'application/octet-stream')
+        
+        return FileResponse(
+            path=full_path,
+            media_type=media_type,
+            filename=os.path.basename(full_path)
+        )
+        
+    except Exception as e:
+        logging.error(f"Error serving document {file_path}: {e}")
+        raise HTTPException(status_code=500, detail="Error serving document")
 
 @app.post('/ask', dependencies=[Depends(verify_api_key)]) 
 async def stream(query_request: QueryRequest):  

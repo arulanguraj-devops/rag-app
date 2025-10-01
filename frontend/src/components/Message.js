@@ -1,9 +1,19 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import References from './References';
 
 const Message = ({ message, isTyping = false }) => {
   const isUser = message.type === 'user';
+  
+  // Debug: Log when bot messages are rendered
+  if (!isUser && !isTyping && message.citations) {
+    console.log('Message component rendering bot message with citations:', {
+      messageId: message.id,
+      citationsCount: message.citations ? message.citations.length : 0,
+      citationsData: message.citations
+    });
+  }
   
   if (isTyping) {
     return (
@@ -33,10 +43,17 @@ const Message = ({ message, isTyping = false }) => {
         {isUser ? (
           <p className="text-sm leading-relaxed">{message.content}</p>
         ) : (
-          <div className="markdown-content text-sm">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {message.content}
-            </ReactMarkdown>
+          <div className="space-y-3">
+            <div className="markdown-content text-sm">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {message.content}
+              </ReactMarkdown>
+            </div>
+            
+            {/* Show references if available */}
+            {message.citations && message.citations.length > 0 && (
+              <References citations={message.citations} />
+            )}
           </div>
         )}
         {message.timestamp && (
