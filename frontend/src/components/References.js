@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExternalLink, FileText, Eye, Book, ChevronDown, ChevronRight } from 'lucide-react';
+import { FileText, Eye, Book, ChevronDown, ChevronRight } from 'lucide-react';
 
 const References = ({ citations = [], onViewDocument }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -105,18 +105,6 @@ const References = ({ citations = [], onViewDocument }) => {
                     >
                       <Eye className="w-3 h-3" />
                     </button>
-                  )}
-                  
-                  {citation.source && (
-                    <a
-                      href={citation.source}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors"
-                      title="Open in new tab"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
                   )}
                 </div>
               </div>

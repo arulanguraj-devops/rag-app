@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ExternalLink, FileText, X, Eye } from 'lucide-react';
+import React from 'react';
+import { FileText, X, Eye } from 'lucide-react';
 
 const CitationItem = ({ citation, onViewDocument }) => {
   const getFileIcon = (source) => {
@@ -55,15 +56,6 @@ const CitationItem = ({ citation, onViewDocument }) => {
         <span className="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
           {citation.id}
         </span>
-        <a
-          href={citation.source}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center space-x-1"
-        >
-          <ExternalLink size={12} />
-          <span>Open</span>
-        </a>
       </div>
     </div>
   );
@@ -132,18 +124,9 @@ const DocumentViewer = ({ citation, isOpen, onClose }) => {
               <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                 Cannot preview this document
               </h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 This document type cannot be previewed in the browser.
               </p>
-              <a
-                href={citation.source}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-              >
-                <ExternalLink size={16} />
-                <span>Open in New Tab</span>
-              </a>
             </div>
           </div>
         </div>

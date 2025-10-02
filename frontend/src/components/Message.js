@@ -247,9 +247,7 @@ const Message = ({ message, isTyping = false, onCitationClick }) => {
       console.error('Error message:', error.message);
       console.error('Stack trace:', error.stack);
       
-      alert(`Error loading document: ${error.message}\n\nTrying to open in new tab...`);
-      // Fallback: open in new tab
-      window.open(citation.source, '_blank', 'noopener,noreferrer');
+      alert(`Error loading document: ${error.message}. Please try again later.`);
     }
   };
 
