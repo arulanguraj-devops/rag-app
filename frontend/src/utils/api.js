@@ -10,7 +10,7 @@ export class APIError extends Error {
   }
 }
 
-export const streamChatResponse = async (query, datastore_key, chat_history, apiKey, onMessage, onComplete, onError, onCitations = () => {}) => {
+export const streamChatResponse = async (query, chat_history, apiKey, onMessage, onComplete, onError, onCitations = () => {}) => {
   try {
     const response = await fetch(`${API_BASE_URL}/ask`, {
       method: 'POST',
@@ -20,7 +20,6 @@ export const streamChatResponse = async (query, datastore_key, chat_history, api
       },
       body: JSON.stringify({
         query,
-        datastore_key,
         chat_history
       })
     });
@@ -81,7 +80,7 @@ export const streamChatResponse = async (query, datastore_key, chat_history, api
   }
 };
 
-export const testApiConnection = async (apiKey, datastoreKey = 'test') => {
+export const testApiConnection = async (apiKey) => {
   try {
     const response = await fetch(`${API_BASE_URL}/ask`, {
       method: 'POST',
@@ -91,7 +90,6 @@ export const testApiConnection = async (apiKey, datastoreKey = 'test') => {
       },
       body: JSON.stringify({
         query: 'test',
-        datastore_key: datastoreKey,
         chat_history: []
       })
     });

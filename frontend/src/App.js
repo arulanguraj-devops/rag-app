@@ -17,7 +17,7 @@ function App() {
   const [conversations, setConversations] = useState([]);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState({ apiKey: '', datastore_key: 'test', theme: 'light' });
+  const [settings, setSettings] = useState({ apiKey: '', theme: 'light' });
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(window.innerWidth < 1024);
   const [appConfig, setAppConfig] = useState(null);
@@ -37,7 +37,6 @@ function App() {
         const savedSettings = getSettings();
         const mergedSettings = {
           apiKey: savedSettings.apiKey || '',
-          datastore_key: savedSettings.datastore_key || config.defaults.datastore_key,
           theme: savedSettings.theme || config.defaults.theme
         };
         setSettings(mergedSettings);
@@ -47,7 +46,7 @@ function App() {
         
         // If no conversations exist, create a default one
         if (savedConversations.length === 0) {
-          const newConv = createNewConversation(null, mergedSettings.datastore_key);
+          const newConv = createNewConversation(null, null);
           saveConversation(newConv);
           setConversations([newConv]);
           setCurrentConversation(newConv);
@@ -58,7 +57,7 @@ function App() {
         // Test API key if it exists
         if (mergedSettings.apiKey) {
           try {
-            const result = await testApiConnection(mergedSettings.apiKey, mergedSettings.datastore_key);
+            const result = await testApiConnection(mergedSettings.apiKey);
             setIsApiKeyValid(result.success);
           } catch (error) {
             setIsApiKeyValid(false);
@@ -126,8 +125,7 @@ function App() {
   }, [appConfig]);
 
   const handleNewConversation = () => {
-    const datastoreKey = settings.datastore_key || appConfig?.defaults?.datastore_key || 'test';
-    const newConv = createNewConversation(null, datastoreKey);
+    const newConv = createNewConversation(null, null);
     saveConversation(newConv);
     setConversations(prev => [newConv, ...prev]);
     setCurrentConversation(newConv);
@@ -177,7 +175,7 @@ function App() {
     // Test the new API key
     if (newSettings.apiKey) {
       try {
-        const result = await testApiConnection(newSettings.apiKey, newSettings.datastore_key);
+        const result = await testApiConnection(newSettings.apiKey);
         setIsApiKeyValid(result.success);
       } catch (error) {
         setIsApiKeyValid(false);
@@ -241,7 +239,6 @@ function App() {
           onUpdateConversation={handleUpdateConversation}
           apiKey={settings.apiKey}
           isApiKeyValid={isApiKeyValid}
-          datastoreKey={settings.datastore_key}
           appConfig={appConfig}
           onCitationClick={handleCitationClick}
         />

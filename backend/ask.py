@@ -200,7 +200,6 @@ async def response_generator(query, datastore_key, chat_history):
 
 class QueryRequest(BaseModel):
     query: str
-    datastore_key: str
     chat_history: list
 
 async def verify_api_key(x_api_key: str = Header(...)):
@@ -273,9 +272,8 @@ async def serve_document(file_path: str):
 async def stream(query_request: QueryRequest):  
     logging.info(f'Query received: {query_request.query}')
     
-    # Use configured default datastore if not provided
-    if not query_request.datastore_key:
-        query_request.datastore_key = config_manager.get_value("defaults", "datastore_key", "test")
+    # Get datastore_key from configuration
+    datastore_key = config_manager.get_value("defaults", "datastore_key", "test")
     
     # Limit query length based on configuration
     max_query_length = config_manager.get_value("api", "max_query_length", 1000)
@@ -283,7 +281,7 @@ async def stream(query_request: QueryRequest):
         raise HTTPException(status_code=400, detail=f"Query too long. Maximum length is {max_query_length} characters.")
     
     query_request.chat_history = []
-    return StreamingResponse(response_generator(query_request.query, query_request.datastore_key, query_request.chat_history), media_type='text/event-stream')
+    return StreamingResponse(response_generator(query_request.query, datastore_key, query_request.chat_history), media_type='text/event-stream')
 
 if __name__ == "__main__":
     import uvicorn

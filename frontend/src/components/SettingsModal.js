@@ -6,7 +6,6 @@ import { testApiConnection } from '../utils/api';
 const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
   const [settings, setSettings] = useState({
     apiKey: '',
-    datastore_key: 'test',
     theme: 'light'
   });
   const [isTestingConnection, setIsTestingConnection] = useState(false);
@@ -19,7 +18,6 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
       const currentSettings = getSettings();
       const mergedSettings = {
         apiKey: currentSettings.apiKey || '',
-        datastore_key: currentSettings.datastore_key || appConfig?.defaults?.datastore_key || 'test',
         theme: currentSettings.theme || appConfig?.defaults?.theme || 'light'
       };
       setSettings(mergedSettings);
@@ -174,25 +172,6 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
               </p>
             )}
           </div>
-
-          {/* Datastore Key */}
-          {appConfig?.features?.datastore_selection_enabled && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Datastore Key
-              </label>
-              <input
-                type="text"
-                value={settings.datastore_key}
-                onChange={(e) => handleInputChange('datastore_key', e.target.value)}
-                placeholder={appConfig?.defaults?.datastore_key || "test"}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                The knowledge base to query (default: {appConfig?.defaults?.datastore_key || "test"})
-              </p>
-            </div>
-          )}
 
           {/* Theme */}
           {appConfig?.features?.theme_selection_enabled && (

@@ -1,7 +1,7 @@
 // Local storage utilities for chat history management
 
-const STORAGE_KEY = 'qurhealth_chat_history';
-const CONVERSATIONS_KEY = 'qurhealth_conversations';
+const STORAGE_KEY = 'chat_history';
+const CONVERSATIONS_KEY = 'conversations';
 
 export const generateConversationId = () => {
   return `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -72,15 +72,12 @@ export const clearAllConversations = () => {
   }
 };
 
-export const createNewConversation = (title = null, datastoreKey = 'test') => {
-  const now = new Date();
+export const createNewConversation = (title = null, datastoreKey = null) => {
   return {
     id: generateConversationId(),
-    title: title || `New Chat ${now.toLocaleDateString()}`,
-    messages: [],
-    createdAt: now.toISOString(),
-    updatedAt: now.toISOString(),
-    datastore_key: datastoreKey // configurable datastore
+    title: title || 'New Conversation',
+    timestamp: new Date().toISOString(),
+    messages: []
   };
 };
 
@@ -135,17 +132,15 @@ export const addMessageToConversation = (conversationId, message) => {
 // Settings management
 export const getSettings = () => {
   try {
-    const stored = localStorage.getItem('qurhealth_settings');
+    const stored = localStorage.getItem('settings');
     return stored ? JSON.parse(stored) : {
       apiKey: '',
-      datastore_key: 'qurhealth',
       theme: 'light'
     };
   } catch (error) {
     console.error('Error loading settings:', error);
     return {
       apiKey: '',
-      datastore_key: 'qurhealth',
       theme: 'light'
     };
   }
@@ -153,7 +148,7 @@ export const getSettings = () => {
 
 export const saveSettings = (settings) => {
   try {
-    localStorage.setItem('qurhealth_settings', JSON.stringify(settings));
+    localStorage.setItem('settings', JSON.stringify(settings));
     return true;
   } catch (error) {
     console.error('Error saving settings:', error);

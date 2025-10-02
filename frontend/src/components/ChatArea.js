@@ -10,7 +10,6 @@ const ChatArea = ({
   onUpdateConversation, 
   apiKey, 
   isApiKeyValid,
-  datastoreKey,
   appConfig,
   onCitationClick 
 }) => {
@@ -83,7 +82,6 @@ const ChatArea = ({
     try {
       await streamChatResponse(
         messageText,
-        datastoreKey || appConfig?.defaults?.datastore_key || 'test',
         chatHistory,
         apiKey,
         // onMessage
