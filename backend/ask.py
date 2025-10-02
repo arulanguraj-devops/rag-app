@@ -279,8 +279,27 @@ class QueryRequest(BaseModel):
     query: str
     chat_history: list
 
-async def verify_api_key(x_api_key: str = Header(...)):
-    if x_api_key != API_KEY:
+async def verify_api_key(
+    x_api_key: str = Header(None),
+    x_amzn_oidc_data: str = Header(None),
+    x_amzn_oidc_identity: str = Header(None),
+    x_amzn_oidc_accesstoken: str = Header(None)
+):
+    # Check if request came through AWS ALB with OIDC authentication
+    is_aws_alb_authenticated = all([
+        x_amzn_oidc_data,
+        x_amzn_oidc_identity,
+        x_amzn_oidc_accesstoken
+    ])
+    
+    # If AWS ALB OIDC auth headers are present, we're authenticated
+    if is_aws_alb_authenticated:
+        logging.debug("Request authenticated via AWS ALB OIDC")
+        return
+        
+    # Fall back to API key validation if no ALB headers
+    if not x_api_key or x_api_key != API_KEY:
+        logging.warning("Invalid or missing API key")
         raise HTTPException(status_code=403, detail="Forbidden: Invalid API Key")
 
 @app.get('/health')
@@ -288,11 +307,81 @@ async def health_check():
     """Simple health check endpoint for API key validation"""
     return {"status": "healthy", "message": "API is working"}
 
+@app.get('/user-info')
+async def get_user_info(
+    x_amzn_oidc_data: str = Header(None),
+    x_amzn_oidc_identity: str = Header(None),
+    x_amzn_oidc_accesstoken: str = Header(None)
+):
+    """Get authenticated user information"""
+    try:
+        # Check if request is coming through AWS ALB with OIDC
+        if all([x_amzn_oidc_data, x_amzn_oidc_identity]):
+            # Extract user info from the ALB headers
+            # The x_amzn_oidc_identity typically contains user info in JWT format
+            user_info = {
+                "authenticated": True,
+                "auth_method": "aws_alb_oidc",
+                "user_identity": x_amzn_oidc_identity
+            }
+            
+            # Try to extract username from JWT claims if available
+            try:
+                # JWT data is Base64 encoded with 3 parts: header.payload.signature
+                import base64
+                import json
+                
+                # x_amzn_oidc_data is a JWT, extract the payload part (second part)
+                jwt_parts = x_amzn_oidc_data.split('.')
+                if len(jwt_parts) >= 2:
+                    # Add padding if needed
+                    payload = jwt_parts[1]
+                    payload += '=' * ((4 - len(payload) % 4) % 4)
+                    
+                    # Decode the payload
+                    decoded_payload = base64.b64decode(payload)
+                    claims = json.loads(decoded_payload)
+                    
+                    # Extract common user identifier fields (adjust based on your OIDC provider)
+                    username = claims.get('name') or claims.get('preferred_username') or claims.get('email') or claims.get('sub')
+                    user_info["username"] = username
+                    user_info["email"] = claims.get('email')
+                    user_info["claims"] = claims
+            except Exception as e:
+                logging.warning(f"Failed to parse JWT claims: {e}")
+                user_info["username"] = "Authenticated User"
+                
+            return user_info
+        else:
+            # API key authentication doesn't provide user info
+            return {
+                "authenticated": True,
+                "auth_method": "api_key",
+                "username": "API User"
+            }
+    except Exception as e:
+        logging.error(f"Error retrieving user info: {e}")
+        return {
+            "authenticated": False,
+            "auth_method": "unknown",
+            "error": str(e)
+        }
+
 @app.post('/test-connection', dependencies=[Depends(verify_api_key)])
-async def test_connection():
+async def test_connection(
+    x_amzn_oidc_identity: str = Header(None)
+):
     """Test API connection without triggering full RAG pipeline"""
     try:
-        return {"status": "success", "message": "API key is valid and connection successful"}
+        auth_method = "API Key"
+        if x_amzn_oidc_identity:
+            auth_method = "AWS ALB OIDC"
+            
+        return {
+            "status": "success", 
+            "message": f"Connection successful using {auth_method} authentication",
+            "auth_method": auth_method
+        }
     except Exception as e:
         logging.error(f"Test connection error: {e}")
         raise HTTPException(status_code=500, detail="Connection test failed")
@@ -360,8 +449,16 @@ async def serve_document(file_path: str):
         raise HTTPException(status_code=500, detail="Error serving document")
 
 @app.post('/ask', dependencies=[Depends(verify_api_key)]) 
-async def stream(query_request: QueryRequest):  
-    logging.info(f'Query received: {query_request.query}')
+async def stream(
+    query_request: QueryRequest,
+    x_amzn_oidc_identity: str = Header(None)
+):  
+    user_identifier = "API User"
+    if x_amzn_oidc_identity:
+        # Log the identity of the authenticated user from ALB
+        user_identifier = x_amzn_oidc_identity
+        
+    logging.info(f'Query received from {user_identifier}: {query_request.query}')
     
     # Get datastore_key from configuration
     datastore_key = config_manager.get_value("defaults", "datastore_key", "test")

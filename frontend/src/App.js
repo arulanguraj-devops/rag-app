@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import SettingsModal from './components/SettingsModal';
 import DocumentViewer from './components/DocumentViewer';
+import Header from './components/Header';
 import { 
   getConversations, 
   createNewConversation, 
@@ -10,7 +11,7 @@ import {
   getSettings,
   saveConversation 
 } from './utils/storage';
-import { testApiConnection } from './utils/api';
+import { testApiConnection, getUserInfo } from './utils/api';
 import { fetchAppConfig } from './utils/config';
 
 function App() {
@@ -19,10 +20,12 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState({ apiKey: '', theme: 'light' });
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(window.innerWidth < 1024);
+  // Set sidebar collapsed by default (true) regardless of screen size
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [appConfig, setAppConfig] = useState(null);
   const [isConfigLoading, setIsConfigLoading] = useState(true);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [userInfo, setUserInfo] = useState(null);
 
   // Load initial data
   useEffect(() => {
@@ -32,6 +35,12 @@ function App() {
         setIsConfigLoading(true);
         const config = await fetchAppConfig();
         setAppConfig(config);
+        
+        // Fetch user info
+        const userInfoResponse = await getUserInfo();
+        if (userInfoResponse.success && userInfoResponse.data) {
+          setUserInfo(userInfoResponse.data);
+        }
         
         // Load settings with config defaults
         const savedSettings = getSettings();
@@ -218,39 +227,52 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-200">
-      {appConfig.ui.sidebar_collapsible && (
-        <Sidebar
-          conversations={conversations}
-          currentConversation={currentConversation}
-          onSelectConversation={handleSelectConversation}
-          onNewConversation={handleNewConversation}
-          onDeleteConversation={handleDeleteConversation}
-          onOpenSettings={() => appConfig.features.settings_enabled && setIsSettingsOpen(true)}
-          isCollapsed={isSidebarCollapsed}
-          onToggleCollapsed={handleToggleSidebar}
-          appConfig={appConfig}
-        />
-      )}
+    <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-200">
+      {/* Top Header */}
+      <Header
+        appConfig={appConfig}
+        userInfo={userInfo}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebar={handleToggleSidebar}
+      />
       
-      <div className="flex-1 flex flex-col min-w-0">
-        <ChatArea
-          conversation={currentConversation}
-          onUpdateConversation={handleUpdateConversation}
-          apiKey={settings.apiKey}
-          isApiKeyValid={isApiKeyValid}
-          appConfig={appConfig}
-          onCitationClick={handleCitationClick}
-        />
+      {/* Main Content Area with Sidebar and Chat */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar */}
+        {appConfig.ui.sidebar_collapsible && (
+          <Sidebar
+            conversations={conversations}
+            currentConversation={currentConversation}
+            onSelectConversation={handleSelectConversation}
+            onNewConversation={handleNewConversation}
+            onDeleteConversation={handleDeleteConversation}
+            onOpenSettings={() => appConfig.features.settings_enabled && setIsSettingsOpen(true)}
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapsed={handleToggleSidebar}
+            appConfig={appConfig}
+          />
+        )}
+        
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <ChatArea
+            conversation={currentConversation}
+            onUpdateConversation={handleUpdateConversation}
+            apiKey={settings.apiKey}
+            isApiKeyValid={isApiKeyValid}
+            appConfig={appConfig}
+            onCitationClick={handleCitationClick}
+          />
+        </div>
+        
+        {/* Right Document Viewer Sidebar */}
+        {selectedDocument && (
+          <DocumentViewer
+            document={selectedDocument}
+            onClose={handleCloseDocument}
+          />
+        )}
       </div>
-      
-      {/* Document Viewer Sidebar */}
-      {selectedDocument && (
-        <DocumentViewer
-          document={selectedDocument}
-          onClose={handleCloseDocument}
-        />
-      )}
       
       {appConfig.features.settings_enabled && (
         <SettingsModal

@@ -74,7 +74,7 @@ const DocumentViewer = ({ document, onClose }) => {
   };
 
   return (
-    <div className="w-[600px] h-full bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col">
+    <div className="w-[600px] h-full bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col flex-shrink-0">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
         <div className="flex items-center space-x-3">

@@ -10,7 +10,8 @@ const Sidebar = ({
   onOpenSettings, 
   isCollapsed, 
   onToggleCollapsed,
-  appConfig 
+  appConfig,
+  userInfo
 }) => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
@@ -45,7 +46,7 @@ const Sidebar = ({
 
   return (
     <>
-      {/* Mobile Overlay */}
+      {/* Mobile Overlay - only on mobile when sidebar is expanded */}
       {!isCollapsed && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
@@ -55,41 +56,52 @@ const Sidebar = ({
       
       {/* Sidebar */}
       <div className={`
-        fixed lg:relative inset-y-0 left-0 z-50
-        ${isCollapsed ? '-translate-x-full lg:translate-x-0' : 'translate-x-0'}
+        fixed lg:relative top-0 bottom-0 left-0 z-40 pt-0 
+        ${isCollapsed ? '-translate-x-full lg:translate-x-0' : 'translate-x-0'} 
         ${isCollapsed ? 'lg:w-16' : 'w-80 lg:w-80'}
         bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300
       `}>
-        {/* Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            {!isCollapsed && (
-              <div className="flex items-center space-x-2">
-                {appConfig?.app?.company_logo_url && (
-                  <img 
-                    src={appConfig.app.company_logo_url} 
-                    alt="Company Logo" 
-                    className="w-6 h-6 object-contain"
-                    onError={(e) => {e.target.style.display = 'none'}}
-                  />
-                )}
-                <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                  {appConfig?.app?.company || 'QurHealth'}
-                </h1>
-              </div>
-            )}
-            <button
-              onClick={() => onToggleCollapsed(!isCollapsed)}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              {isCollapsed ? 
-                <ChevronRight size={20} className="text-gray-600 dark:text-gray-400" /> : 
-                <ChevronLeft size={20} className="text-gray-600 dark:text-gray-400" />
-              }
-            </button>
-          </div>
-          
+        {/* Sidebar Title and Controls */}
+        <div className={`p-4 border-b border-gray-200 dark:border-gray-700 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
+          {/* When expanded: Show title and collapse button */}
           {!isCollapsed && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100">
+                  Conversations
+                </h2>
+              </div>
+              <button
+                onClick={() => onToggleCollapsed(true)}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="Collapse sidebar"
+              >
+                <ChevronLeft size={20} className="text-gray-600 dark:text-gray-400" />
+              </button>
+            </div>
+          )}
+          
+          {/* When collapsed: Show expand button */}
+          {isCollapsed && (
+            <button
+              onClick={() => onToggleCollapsed(false)}
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-6"
+              title="Expand sidebar"
+            >
+              <ChevronRight size={20} className="text-gray-600 dark:text-gray-400" />
+            </button>
+          )}
+          
+          {/* New Chat Button */}
+          {isCollapsed ? (
+            <button
+              onClick={onNewConversation}
+              className="w-10 h-10 bg-primary-500 hover:bg-primary-600 text-white rounded-lg flex items-center justify-center transition-colors mb-6"
+              title="New chat"
+            >
+              <Plus size={20} />
+            </button>
+          ) : (
             <button
               onClick={onNewConversation}
               className="w-full mt-3 bg-primary-500 hover:bg-primary-600 text-white px-4 py-3 rounded-lg flex items-center space-x-2 transition-colors"
@@ -98,9 +110,20 @@ const Sidebar = ({
               <span>New Chat</span>
             </button>
           )}
+          
+          {/* History Button (only shown when collapsed) */}
+          {isCollapsed && (
+            <button
+              onClick={() => onToggleCollapsed(false)} 
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-6"
+              title="View conversation history"
+            >
+              <span className="font-bold text-gray-700 dark:text-gray-300 text-lg">H</span>
+            </button>
+          )}
         </div>
 
-        {/* Conversations List */}
+        {/* Conversations List - Only shown when expanded */}
         {!isCollapsed && (
           <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
             {conversations.length === 0 ? (
@@ -172,30 +195,26 @@ const Sidebar = ({
 
         {/* Settings Button */}
         {appConfig?.features?.settings_enabled && (
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          <div className={`p-4 border-t border-gray-200 dark:border-gray-700 ${isCollapsed ? 'flex justify-center' : ''}`}>
             <button
               onClick={onOpenSettings}
               className={`
-                w-full flex items-center space-x-2 px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300
-                ${isCollapsed ? 'justify-center' : 'justify-start'}
+                ${isCollapsed 
+                  ? 'w-10 h-10 flex items-center justify-center' 
+                  : 'w-full flex items-center space-x-2 px-4 py-3 justify-start'
+                }
+                rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300
               `}
+              title="Settings"
             >
-              <Settings size={18} />
+              <Settings size={isCollapsed ? 20 : 18} />
               {!isCollapsed && <span>Settings</span>}
             </button>
           </div>
         )}
       </div>
 
-      {/* Collapsed Mobile Toggle */}
-      {isCollapsed && (
-        <button
-          onClick={() => onToggleCollapsed(false)}
-          className="fixed top-4 left-4 z-50 lg:hidden bg-primary-500 text-white p-3 rounded-lg shadow-lg"
-        >
-          <MessageCircle size={20} />
-        </button>
-      )}
+      {/* We don't need this button anymore since it's in the header now */}
     </>
   );
 };

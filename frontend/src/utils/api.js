@@ -2,6 +2,13 @@
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000';
 
+// Function to get credentials to include with every request
+const getCredentials = () => {
+  return {
+    credentials: 'include', // Include credentials for CORS requests (cookies)
+  };
+};
+
 export class APIError extends Error {
   constructor(message, status) {
     super(message);
@@ -21,7 +28,8 @@ export const streamChatResponse = async (query, chat_history, apiKey, onMessage,
       body: JSON.stringify({
         query,
         chat_history
-      })
+      }),
+      ...getCredentials()
     });
 
     if (!response.ok) {
@@ -91,7 +99,8 @@ export const testApiConnection = async (apiKey) => {
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': apiKey
-      }
+      },
+      ...getCredentials()
     });
 
     if (response.ok) {
@@ -100,6 +109,38 @@ export const testApiConnection = async (apiKey) => {
         success: true,
         status: response.status,
         message: data.message || 'Connection successful'
+      };
+    } else {
+      return {
+        success: false,
+        status: response.status,
+        message: `HTTP ${response.status}`
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      status: null,
+      message: error.message
+    };
+  }
+};
+
+export const getUserInfo = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/user-info`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      ...getCredentials()
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        success: true,
+        data
       };
     } else {
       return {
