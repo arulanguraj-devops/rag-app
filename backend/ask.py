@@ -145,8 +145,9 @@ def generate(query, datastore_key, chat_history):
         if source.lower().endswith('.csv'):
             page = None
         
-        # Create the document URL for the frontend
-        document_url = f"http://127.0.0.1:8000/documents/{source}" if source != 'Unknown' else None
+        # Create the document URL for the frontend using the configured base URL
+        base_url = config_manager.get_value("api", "base_url", "http://127.0.0.1:8000")
+        document_url = f"{base_url}/documents/{source}" if source != 'Unknown' else None
         
         citation = {
             "id": f"ref_{len(citations)+1}",  # Use actual citation count

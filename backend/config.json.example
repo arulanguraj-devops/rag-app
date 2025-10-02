@@ -33,6 +33,7 @@
   "api": {
     "api_key": "",
     "openai_api_key": "",
+    "base_url": "http://127.0.0.1:8000",
     "cors_origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
     "max_query_length": 1000,
     "rate_limit_enabled": false
