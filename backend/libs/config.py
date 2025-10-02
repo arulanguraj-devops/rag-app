@@ -52,7 +52,9 @@ class ConfigManager:
                 "datastore_key": "test",
                 "theme": "light",
                 "max_conversations": 50,
-                "max_chat_history": 10
+                "max_chat_history": 10,
+                "max_citations": 5,
+                "relevance_threshold": 0.50
             },
             "ui": {
                 "sidebar_collapsible": True,
@@ -61,9 +63,26 @@ class ConfigManager:
                 "auto_scroll": True
             },
             "api": {
+                "api_key": "",
+                "openai_api_key": "",
                 "cors_origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
                 "max_query_length": 1000,
                 "rate_limit_enabled": False
+            },
+            "models": {
+                "chat_model": {
+                    "provider": "openai",
+                    "model_name": "gpt-4o-mini",
+                    "temperature": 0.5,
+                    "streaming": True
+                },
+                "embedding_model": {
+                    "provider": "openai",
+                    "model_name": "text-embedding-ada-002"
+                }
+            },
+            "logging": {
+                "level": "INFO"
             }
         }
     
@@ -82,6 +101,34 @@ class ConfigManager:
         """Get a specific value from the configuration"""
         section_config = self.get_section(section)
         return section_config.get(key, default)
+    
+    def get_api_key(self) -> str:
+        """Get the internal API key from configuration"""
+        return self.get_value("api", "api_key", "")
+    
+    def get_openai_api_key(self) -> str:
+        """Get the OpenAI API key from configuration"""
+        return self.get_value("api", "openai_api_key", "")
+    
+    def get_chat_model_config(self) -> Dict[str, Any]:
+        """Get chat model configuration"""
+        return self.get_section("models").get("chat_model", {
+            "provider": "openai",
+            "model_name": "gpt-4o-mini",
+            "temperature": 0.5,
+            "streaming": True
+        })
+    
+    def get_embedding_model_config(self) -> Dict[str, Any]:
+        """Get embedding model configuration"""
+        return self.get_section("models").get("embedding_model", {
+            "provider": "openai",
+            "model_name": "text-embedding-ada-002"
+        })
+    
+    def get_log_level(self) -> str:
+        """Get logging level from configuration"""
+        return self.get_value("logging", "level", "INFO")
     
     def reload_config(self):
         """Reload configuration from file"""

@@ -3,13 +3,17 @@ import shutil
 from langchain_chroma import Chroma
 from libs.vectordb import initialize_documents
 from libs.custom_logger import setup_logger
-from dotenv import load_dotenv
+from libs.config import config_manager
 
 # Initialize logging
 logging = setup_logger()
 
-load_dotenv()
-API_KEY=os.getenv('API_KEY')
+# Load OpenAI API key from configuration
+OPENAI_API_KEY = config_manager.get_openai_api_key()
+
+# Set OpenAI API key as environment variable for the OpenAI client
+if OPENAI_API_KEY and OPENAI_API_KEY != "your-openai-api-key-here":
+    os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
 
 def cleanup_and_rebuild():
     """Clean up existing vector database and rebuild with enhanced metadata"""

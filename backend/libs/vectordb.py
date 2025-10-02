@@ -137,7 +137,17 @@ def upload_document(file_path: str, brain_folder: str):
     persist_dir = "chroma_data"
     datastore_path = os.path.join(persist_dir, brain_folder)
     os.makedirs(datastore_path, exist_ok=True)
-    embeddings = OpenAIEmbeddings()
+    
+    # Get embedding model configuration and API key
+    from libs.config import config_manager
+    
+    # Set OpenAI API key as environment variable
+    openai_api_key = config_manager.get_openai_api_key()
+    if openai_api_key and openai_api_key != "your-openai-api-key-here":
+        os.environ['OPENAI_API_KEY'] = openai_api_key
+    
+    embedding_config = config_manager.get_embedding_model_config()
+    embeddings = OpenAIEmbeddings(model=embedding_config.get("model_name", "text-embedding-ada-002"))
     vectorstore = Chroma(embedding_function=embeddings, persist_directory=datastore_path)
 
     # Load file hashes

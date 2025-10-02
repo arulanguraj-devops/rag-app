@@ -40,7 +40,14 @@ def setup_logger():
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-        # Get log level from environment variable, default to DEBUG
-        log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
-        logger.setLevel(getattr(logging, log_level, logging.DEBUG))  # Fallback to DEBUG if invalid level
+        # Get log level from configuration, default to INFO
+        try:
+            from libs.config import config_manager
+            log_level = config_manager.get_log_level()
+        except (ImportError, Exception):
+            # Fallback to INFO if config is not available
+            log_level = 'INFO'
+        
+        log_level = log_level.upper()
+        logger.setLevel(getattr(logging, log_level, logging.INFO))  # Fallback to INFO if invalid level
     return logger

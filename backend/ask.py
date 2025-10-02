@@ -9,7 +9,6 @@ import asyncio
 import json
 from queue import Queue
 from threading import Thread
-from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain.schema.messages import HumanMessage
 from langchain_chroma import Chroma
@@ -26,11 +25,25 @@ logging = setup_logger()
 #initialize documents vectorizing
 #initialize_documents()
 
-# Load environment variables
-load_dotenv()
-API_KEY=os.getenv('API_KEY')
+# Load API keys from configuration
+API_KEY = config_manager.get_api_key()  # Internal API key for FastAPI authentication
+OPENAI_API_KEY = config_manager.get_openai_api_key()  # OpenAI API key
 
-embeddings = OpenAIEmbeddings()
+# Validate API keys are configured
+if not API_KEY:
+    logging.error("Internal API key not configured. Please set 'api.api_key' in config.json")
+    raise ValueError("Internal API key not configured in config.json")
+
+if not OPENAI_API_KEY or OPENAI_API_KEY == "your-openai-api-key-here":
+    logging.error("OpenAI API key not configured. Please set 'api.openai_api_key' in config.json")
+    raise ValueError("OpenAI API key not configured in config.json")
+
+# Set OpenAI API key as environment variable for the OpenAI client
+os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
+
+# Initialize embeddings with configuration
+embedding_config = config_manager.get_embedding_model_config()
+embeddings = OpenAIEmbeddings(model=embedding_config.get("model_name", "text-embedding-ada-002"))
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -64,7 +77,15 @@ def generate(query, datastore_key, chat_history):
     
     # Create a fresh handler for this request to avoid citation accumulation
     stream_handler = SteamCustomHandler(streamer_queue)
-    llm = ChatOpenAI(model="gpt-4o-mini", streaming=True, callbacks=[stream_handler], temperature=0.5)
+    
+    # Get chat model configuration
+    chat_model_config = config_manager.get_chat_model_config()
+    llm = ChatOpenAI(
+        model=chat_model_config.get("model_name", "gpt-4o-mini"),
+        streaming=chat_model_config.get("streaming", True),
+        callbacks=[stream_handler],
+        temperature=chat_model_config.get("temperature", 0.5)
+    )
     
     vectorstore = get_vectorstore(datastore_key)
     

@@ -31,8 +31,25 @@
     "auto_scroll": true
   },
   "api": {
+    "api_key": "",
+    "openai_api_key": "",
     "cors_origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
     "max_query_length": 1000,
     "rate_limit_enabled": false
+  },
+  "models": {
+    "chat_model": {
+      "provider": "openai",
+      "model_name": "gpt-4o-mini",
+      "temperature": 0.5,
+      "streaming": true
+    },
+    "embedding_model": {
+      "provider": "openai",
+      "model_name": "text-embedding-ada-002"
+    }
+  },
+  "logging": {
+    "level": "INFO"
   }
 }
