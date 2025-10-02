@@ -32,39 +32,102 @@ class SteamCustomHandler(BaseCallbackHandler):
         logging.info("Handler citations cleared")
     
     def extract_used_citations(self, response_text):
-        """Extract citation numbers that are actually used in the response"""
-        # Find all citation patterns like [1], [2], [3], etc.
+        """Extract all citations that match the available citation range"""
+        if not self._citations:
+            return []
+        
+        # Find all citation numbers in the response
         citation_pattern = r'\[(\d+)\]'
         used_citation_numbers = set()
         
         logging.debug(f"Analyzing response text for citations: {response_text[:200]}...")
+        logging.info(f"Full response text: {response_text}")
         
+        all_matches = []
         for match in re.finditer(citation_pattern, response_text):
             citation_num = int(match.group(1))
             used_citation_numbers.add(citation_num)
+            all_matches.append(citation_num)
         
-        # Filter citations to only include the ones used in the response
-        used_citations = []
-        for citation_num in sorted(used_citation_numbers):
-            # Citation numbers are 1-indexed, but array is 0-indexed
-            if 1 <= citation_num <= len(self._citations):
-                citation = self._citations[citation_num - 1].copy()
-                # Update the citation ID to match the order it appears in the response
-                citation['id'] = f"ref_{citation_num}"
-                used_citations.append(citation)
-                logging.debug(f"Including citation {citation_num}: {citation['title']}")
+        logging.info(f"All citation numbers found in response: {all_matches}")
+        logging.info(f"Available citations range: 1 to {len(self._citations)}")
         
-        logging.info(f"Response contains {len(used_citation_numbers)} unique citations: {sorted(used_citation_numbers)}")
-        logging.info(f"Filtered to {len(used_citations)} used citations from {len(self._citations)} total citations")
+        # Instead of filtering citations, return ALL available citations
+        # because the LLM was given access to all of them
+        logging.info(f"Returning all {len(self._citations)} available citations (LLM had access to all)")
         
-        return used_citations
+        return self._citations
 
     # On the arrival of the new token, we are adding the new token to the queue  
     def on_llm_new_token(self, token: str, **kwargs) -> None:  
         # Collect the complete response for citation analysis
         self._complete_response += token
+        # Send token as-is - we'll handle invalid citations in the extraction phase
         self._queue.put(token)
         logging.debug(f"New token received: {token}")  # Log the received token
+    
+    def clean_invalid_citations_from_complete_response(self, response_text):
+        """Remove invalid citation numbers from complete response text"""
+        if not self._citations:
+            return response_text
+            
+        max_citation = len(self._citations)
+        
+        def replace_invalid_citation(match):
+            citation_num = int(match.group(1))
+            if 1 <= citation_num <= max_citation:
+                return match.group(0)  # Keep valid citations
+            else:
+                logging.warning(f"Removing invalid citation [{citation_num}] from response (max: {max_citation})")
+                return ""  # Remove invalid citations
+        
+        # Remove invalid citations like [6], [7], [8], etc. if we only have 5 citations
+        citation_pattern = r'\[(\d+)\]'
+        cleaned_text = re.sub(citation_pattern, replace_invalid_citation, response_text)
+        
+        return cleaned_text
+
+    def renumber_citations_in_response(self, response_text):
+        """Renumber citations in response text to match the filtered citation list"""
+        if not hasattr(self, '_citation_mapping') or not self._citation_mapping:
+            return response_text
+            
+        def replace_citation(match):
+            original_num = int(match.group(1))
+            if original_num in self._citation_mapping:
+                new_num = self._citation_mapping[original_num]
+                logging.debug(f"Renumbering citation [{original_num}] -> [{new_num}]")
+                return f"[{new_num}]"
+            else:
+                # This should have been removed by clean_invalid_citations_from_complete_response
+                logging.warning(f"Found unmapped citation [{original_num}] during renumbering")
+                return ""  # Remove unmapped citations
+        
+        citation_pattern = r'\[(\d+)\]'
+        renumbered_text = re.sub(citation_pattern, replace_citation, response_text)
+        
+        return renumbered_text
+
+    def clean_invalid_citations(self, text):
+        """Remove invalid citation numbers from text as it streams"""
+        if not self._citations:
+            return text
+            
+        max_citation = len(self._citations)
+        
+        def replace_invalid_citation(match):
+            citation_num = int(match.group(1))
+            if 1 <= citation_num <= max_citation:
+                return match.group(0)  # Keep valid citations
+            else:
+                logging.warning(f"Removing invalid citation [{citation_num}] from response (max: {max_citation})")
+                return ""  # Remove invalid citations
+        
+        # Remove invalid citations like [6], [7], [8], etc. if we only have 5 citations
+        citation_pattern = r'\[(\d+)\]'
+        cleaned_text = re.sub(citation_pattern, replace_invalid_citation, text)
+        
+        return cleaned_text
 
     # On starting or initializing, we log a starting message  
     def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any) -> None:  
@@ -76,21 +139,31 @@ class SteamCustomHandler(BaseCallbackHandler):
         """Run when LLM ends running."""  
         logging.info("LLM generation concluded")  # Log when generation ends
         
-        # Extract only the citations that were actually used in the response
-        if self._citations and self._complete_response:
-            used_citations = self.extract_used_citations(self._complete_response)
+        # Clean invalid citations from the complete response before processing
+        if self._complete_response and self._citations:
+            original_response = self._complete_response
+            cleaned_response = self.clean_invalid_citations_from_complete_response(self._complete_response)
             
-            if used_citations:
+            if cleaned_response != original_response:
+                logging.info("Cleaned invalid citations from response")
+                # Update the stored response with the cleaned version
+                self._complete_response = cleaned_response
+        
+        # Extract all available citations (no filtering)
+        if self._citations and self._complete_response:
+            available_citations = self.extract_used_citations(self._complete_response)
+            
+            if available_citations:
                 import json
                 citation_data = {
                     "type": "citations",
-                    "data": used_citations
+                    "data": available_citations
                 }
-                logging.info(f"Sending {len(used_citations)} used citations to frontend (filtered from {len(self._citations)} total)")
+                logging.info(f"Sending {len(available_citations)} citations to frontend")
                 # Send the citation data object directly, not as JSON string
                 self._queue.put(citation_data)
             else:
-                logging.info("No citations were used in the response")
+                logging.info("No citations available")
         else:
             logging.warning("No citations available or no response generated")
         

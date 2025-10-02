@@ -138,9 +138,25 @@ def generate(query, datastore_key, chat_history):
         }
         citations.append(citation)
     
-    # Filter similar_documents to match the filtered citations
-    filtered_documents = [doc for doc, score in similar_documents_with_scores 
-                         if score <= relevance_threshold]  # Use same threshold as citations
+    # Filter similar_documents to match the filtered citations - MUST use same limit
+    filtered_documents = []
+    for i, (doc, score) in enumerate(similar_documents_with_scores):
+        # Stop if we've reached the same limit as citations
+        if len(filtered_documents) >= max_citations:
+            break
+            
+        # Use same relevance threshold as citations
+        if score <= relevance_threshold:
+            filtered_documents.append(doc)
+    
+    # Ensure we have the same number of documents as citations
+    if len(filtered_documents) != len(citations):
+        logging.warning(f"Mismatch: {len(citations)} citations but {len(filtered_documents)} documents")
+        # Adjust to match - this should not happen with the fix above
+        min_count = min(len(citations), len(filtered_documents))
+        citations = citations[:min_count]
+        filtered_documents = filtered_documents[:min_count]
+        logging.info(f"Adjusted to {len(citations)} citations and {len(filtered_documents)} documents")
     
     # Set citations in the stream handler
     stream_handler.set_citations(citations)
@@ -168,23 +184,27 @@ def generate(query, datastore_key, chat_history):
     
     # Create the prompt including chat history
     chat_context = "\n".join(f"User: {msg['user']}\nBot: {msg['bot']}" for msg in chat_history)
+    num_references = len(filtered_documents)
+    available_citations = ", ".join([f"[{i+1}]" for i in range(num_references)])
+    
     prompt = f"""You are QurHealth Assistant, a helpful AI healthcare assistant. 
 
-IMPORTANT INSTRUCTIONS:
-- Use the provided numbered references [1], [2], [3], etc. in your response to cite information
-- CRITICAL: Include citation numbers [1] or [2] IMMEDIATELY after each piece of information from the references
-- DO NOT put all citations at the end - place them right after the relevant content
+CRITICAL CITATION RULES - FOLLOW EXACTLY:
+- You have EXACTLY {num_references} references available: {available_citations}
+- DO NOT USE any citation numbers higher than [{num_references}]
+- NEVER use citations like [{num_references+1}], [{num_references+2}], etc. - THEY DON'T EXIST
+- If you need to cite information, use ONLY: {available_citations}
+- Any citation outside this range will cause errors
+
+RESPONSE INSTRUCTIONS:
+- Use the provided numbered references to cite information immediately after relevant content
 - Example: "The holiday is on 14.01.2025 [1] and falls on Tuesday [2]."
-- If you don't know the answer, say "I regret to inform you that I am unable to provide a specific answer at this time, as this information is not available to me."
 - Format your response clearly using markdown for better readability
-- For tabular data, create well-formatted tables with appropriate columns and include citations for each row
-- When asked for complete or full information, include ALL relevant data mentioned in the references
-- For lists, use proper bullet points or numbered lists with citations after each item
+- If you don't know the answer, say "I regret to inform you that I am unable to provide a specific answer at this time, as this information is not available to me."
 - Be concise and well-organized in your responses
 - Focus on the most relevant information from the context
-- Make sure to compile information from ALL relevant references to provide complete answers
 
-NUMBERED REFERENCES:
+NUMBERED REFERENCES (CITATIONS {available_citations} ONLY):
 {context_with_citations}
 
 CHAT HISTORY:

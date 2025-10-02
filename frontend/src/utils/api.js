@@ -59,6 +59,10 @@ export const streamChatResponse = async (query, chat_history, apiKey, onMessage,
               } else if (data.type === 'citations' && data.data) {
                 console.log('Received citations from backend:', data.data);
                 onCitations(data.data);
+              } else if (data.type === 'correction' && data.data) {
+                console.log('Received corrected response from backend');
+                // Signal to replace the current response with the corrected one
+                onMessage('\n\n--- Response corrected to remove invalid citations ---\n\n' + data.data, true);
               } else if (data.data) {
                 // Backward compatibility for old format
                 onMessage(data.data);
