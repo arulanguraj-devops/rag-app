@@ -82,23 +82,28 @@ export const streamChatResponse = async (query, chat_history, apiKey, onMessage,
 
 export const testApiConnection = async (apiKey) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/ask`, {
+    const response = await fetch(`${API_BASE_URL}/test-connection`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': apiKey
-      },
-      body: JSON.stringify({
-        query: 'test',
-        chat_history: []
-      })
+      }
     });
 
-    return {
-      success: response.ok,
-      status: response.status,
-      message: response.ok ? 'Connection successful' : `HTTP ${response.status}`
-    };
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        success: true,
+        status: response.status,
+        message: data.message || 'Connection successful'
+      };
+    } else {
+      return {
+        success: false,
+        status: response.status,
+        message: `HTTP ${response.status}`
+      };
+    }
   } catch (error) {
     return {
       success: false,

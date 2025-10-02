@@ -1,3 +1,4 @@
+import re
 from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -49,8 +50,7 @@ app.add_middleware(
 
 # Create a Streamer queue
 streamer_queue = Queue()
-stream_handler = SteamCustomHandler(streamer_queue)
-llm = ChatOpenAI(model="gpt-4o-mini", streaming=True, callbacks=[stream_handler], temperature=0.5)
+# Note: stream_handler will be created per request to avoid citation accumulation
 
 # Function to get the vectorstore for retrieval
 def get_vectorstore(datastore_key: str):
@@ -61,6 +61,11 @@ def get_vectorstore(datastore_key: str):
 
 def generate(query, datastore_key, chat_history):  
     logging.debug(f"Starting generation for query: {query} with datastore_key: {datastore_key}")
+    
+    # Create a fresh handler for this request to avoid citation accumulation
+    stream_handler = SteamCustomHandler(streamer_queue)
+    llm = ChatOpenAI(model="gpt-4o-mini", streaming=True, callbacks=[stream_handler], temperature=0.5)
+    
     vectorstore = get_vectorstore(datastore_key)
     
     # Retrieve more documents initially, then filter by relevance
@@ -73,16 +78,30 @@ def generate(query, datastore_key, chat_history):
     
     # Collect citation information
     citations = []
+    max_citations = config_manager.get_value("defaults", "max_citations", 5)  # Configurable limit
+    relevance_threshold = config_manager.get_value("defaults", "relevance_threshold", 0.4)  # Configurable threshold
+    
+    logging.info(f"Processing {len(similar_documents_with_scores)} documents from vector search")
+    logging.info(f"Using relevance threshold: {relevance_threshold}, max citations: {max_citations}")
+    
     for i, (doc, score) in enumerate(similar_documents_with_scores):
+        # Stop if we've reached the maximum number of citations
+        if len(citations) >= max_citations:
+            logging.info(f"Reached maximum citations limit ({max_citations}), stopping processing")
+            break
+            
         # Use a more selective relevance threshold to filter out irrelevant documents
-        # Lower scores are better (closer similarity)
-        relevance_threshold = 0.55  # More selective threshold
+        # Lower scores are better (closer similarity) - be more selective
+        
+        logging.debug(f"Document {i+1}: Score {score:.3f}, Title: {doc.metadata.get('title', 'Unknown')}")
         
         # Skip documents that are not relevant enough
         if score > relevance_threshold:
-            logging.info(f"Skipping irrelevant document: {doc.metadata.get('title', 'Unknown')} (Score: {score:.3f})")
+            logging.info(f"Skipping irrelevant document: {doc.metadata.get('title', 'Unknown')} (Score: {score:.3f}) - above threshold {relevance_threshold}")
             continue
             
+        logging.info(f"Including document: {doc.metadata.get('title', 'Unknown')} (Score: {score:.3f}) - below threshold {relevance_threshold}")
+        
         # Handle both old and new metadata formats
         source = doc.metadata.get('source', doc.metadata.get('file_path', 'Unknown'))
         title = doc.metadata.get('title', os.path.basename(source) if source != 'Unknown' else 'Unknown Document')
@@ -112,7 +131,7 @@ def generate(query, datastore_key, chat_history):
     
     # Filter similar_documents to match the filtered citations
     filtered_documents = [doc for doc, score in similar_documents_with_scores 
-                         if score <= 0.55]
+                         if score <= relevance_threshold]  # Use same threshold as citations
     
     # Set citations in the stream handler
     stream_handler.set_citations(citations)
@@ -177,6 +196,14 @@ def start_generation(query, datastore_key, chat_history):
 
 async def response_generator(query, datastore_key, chat_history):  
     logging.info(f"Response generator started for query: {query}")
+    
+    # Clear any remaining items in the queue from previous requests
+    while not streamer_queue.empty():
+        try:
+            streamer_queue.get_nowait()
+        except:
+            break
+    
     start_generation(query, datastore_key, chat_history)  
     while True:  
         value = await asyncio.to_thread(streamer_queue.get)
@@ -205,6 +232,20 @@ class QueryRequest(BaseModel):
 async def verify_api_key(x_api_key: str = Header(...)):
     if x_api_key != API_KEY:
         raise HTTPException(status_code=403, detail="Forbidden: Invalid API Key")
+
+@app.get('/health')
+async def health_check():
+    """Simple health check endpoint for API key validation"""
+    return {"status": "healthy", "message": "API is working"}
+
+@app.post('/test-connection', dependencies=[Depends(verify_api_key)])
+async def test_connection():
+    """Test API connection without triggering full RAG pipeline"""
+    try:
+        return {"status": "success", "message": "API key is valid and connection successful"}
+    except Exception as e:
+        logging.error(f"Test connection error: {e}")
+        raise HTTPException(status_code=500, detail="Connection test failed")
 
 @app.get('/config')
 async def get_config():

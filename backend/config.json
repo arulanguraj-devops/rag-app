@@ -20,7 +20,9 @@
     "datastore_key": "test",
     "theme": "light",
     "max_conversations": 50,
-    "max_chat_history": 10
+    "max_chat_history": 10,
+    "max_citations": 5,
+    "relevance_threshold": 0.50
   },
   "ui": {
     "sidebar_collapsible": true,
