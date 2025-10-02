@@ -36,10 +36,13 @@ function App() {
         const config = await fetchAppConfig();
         setAppConfig(config);
         
-        // Fetch user info
+        // Fetch user info from ALB authentication
         const userInfoResponse = await getUserInfo();
+        let isAlbAuthenticated = false;
         if (userInfoResponse.success && userInfoResponse.data) {
           setUserInfo(userInfoResponse.data);
+          isAlbAuthenticated = userInfoResponse.data.authenticated && 
+            userInfoResponse.data.auth_method === 'aws_alb_oidc';
         }
         
         // Load settings with config defaults
@@ -63,14 +66,20 @@ function App() {
           setCurrentConversation(savedConversations[0]);
         }
         
-        // Test API key if it exists
-        if (mergedSettings.apiKey) {
-          try {
+        // Test connection - either with API key or ALB authentication
+        try {
+          // Try with API key first if available
+          if (mergedSettings.apiKey) {
             const result = await testApiConnection(mergedSettings.apiKey);
             setIsApiKeyValid(result.success);
-          } catch (error) {
-            setIsApiKeyValid(false);
+          } 
+          // If ALB authenticated, test connection without API key
+          else if (isAlbAuthenticated) {
+            const result = await testApiConnection();
+            setIsApiKeyValid(result.success);
           }
+        } catch (error) {
+          setIsApiKeyValid(false);
         }
       } catch (error) {
         console.error('Error loading application data:', error);
@@ -94,12 +103,12 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Auto-open settings if no API key is configured and settings are enabled
+  // Auto-open settings if no API key is configured, no ALB auth is available, and settings are enabled
   useEffect(() => {
-    if (appConfig && !settings.apiKey && conversations.length > 0 && appConfig.features.settings_enabled) {
+    if (appConfig && !settings.apiKey && !userInfo?.authenticated && conversations.length > 0 && appConfig.features.settings_enabled) {
       setIsSettingsOpen(true);
     }
-  }, [settings.apiKey, conversations.length, appConfig]);
+  }, [settings.apiKey, conversations.length, appConfig, userInfo]);
 
   // Apply theme when settings change
   useEffect(() => {
@@ -262,6 +271,7 @@ function App() {
             isApiKeyValid={isApiKeyValid}
             appConfig={appConfig}
             onCitationClick={handleCitationClick}
+            userInfo={userInfo}
           />
         </div>
         

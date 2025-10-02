@@ -19,12 +19,18 @@ export class APIError extends Error {
 
 export const streamChatResponse = async (query, chat_history, apiKey, onMessage, onComplete, onError, onCitations = () => {}) => {
   try {
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    
+    // Only add API key if provided (for backward compatibility)
+    if (apiKey) {
+      headers['X-API-Key'] = apiKey;
+    }
+    
     const response = await fetch(`${API_BASE_URL}/ask`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': apiKey
-      },
+      headers: headers,
       body: JSON.stringify({
         query,
         chat_history
@@ -94,12 +100,18 @@ export const streamChatResponse = async (query, chat_history, apiKey, onMessage,
 
 export const testApiConnection = async (apiKey) => {
   try {
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    
+    // Only add API key if provided (for backward compatibility)
+    if (apiKey) {
+      headers['X-API-Key'] = apiKey;
+    }
+    
     const response = await fetch(`${API_BASE_URL}/test-connection`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': apiKey
-      },
+      headers: headers,
       ...getCredentials()
     });
 
@@ -108,7 +120,8 @@ export const testApiConnection = async (apiKey) => {
       return {
         success: true,
         status: response.status,
-        message: data.message || 'Connection successful'
+        message: data.message || 'Connection successful',
+        auth_method: data.auth_method || 'unknown'
       };
     } else {
       return {

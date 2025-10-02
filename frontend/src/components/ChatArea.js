@@ -11,7 +11,8 @@ const ChatArea = ({
   apiKey, 
   isApiKeyValid,
   appConfig,
-  onCitationClick 
+  onCitationClick,
+  userInfo
 }) => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,8 +45,12 @@ const ChatArea = ({
   }, [messages, isTyping, currentResponse, appConfig]);
 
   const handleSendMessage = async (messageText) => {
-    if (!apiKey || !isApiKeyValid || !conversation) {
-      setError('Please configure a valid API key first.');
+    // Allow either valid API key OR ALB authentication (userInfo)
+    const hasAlbAuth = userInfo?.authenticated && userInfo?.auth_method === 'aws_alb_oidc';
+    const hasValidAuth = (apiKey && isApiKeyValid) || hasAlbAuth;
+    
+    if (!hasValidAuth || !conversation) {
+      setError('Authentication required. Please configure a valid API key or use ALB authentication.');
       return;
     }
 
@@ -242,7 +247,7 @@ const ChatArea = ({
       <ChatInput
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
-        disabled={!apiKey || !isApiKeyValid || !conversation}
+        disabled={!((apiKey && isApiKeyValid) || (userInfo?.authenticated && userInfo?.auth_method === 'aws_alb_oidc')) || !conversation}
       />
     </div>
   );
