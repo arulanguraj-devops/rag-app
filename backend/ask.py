@@ -107,6 +107,15 @@ def generate(query, datastore_key, chat_history):
         title = doc.metadata.get('title', os.path.basename(source) if source != 'Unknown' else 'Unknown Document')
         page = doc.metadata.get('page', None)
         
+        # Debug logging for page numbers
+        logging.debug(f"Document metadata: {doc.metadata}")
+        logging.debug(f"Page number from metadata: {page} (type: {type(page)})")
+        
+        # Fix page numbering: PyPDFLoader uses 0-based indexing, but PDF viewers expect 1-based
+        if page is not None and isinstance(page, int) and source.lower().endswith('.pdf'):
+            page = page + 1  # Convert from 0-based to 1-based for PDF viewers
+            logging.debug(f"Adjusted page number for PDF viewer: {page}")
+        
         # Clean up the source path for display
         if source.startswith('./') or source.startswith('.\\'):
             source = source[2:]

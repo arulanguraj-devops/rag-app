@@ -113,7 +113,8 @@ def upload_document(file_path: str, brain_folder: str):
         
         # Add page number for PDFs if available
         if file_extension.lower() == ".pdf" and hasattr(doc, 'metadata') and 'page' in doc.metadata:
-            # PyPDFLoader already provides page metadata
+            # PyPDFLoader already provides page metadata (0-based indexing)
+            # We'll adjust this later when creating citations for PDF viewers
             pass
         elif file_extension.lower() == ".pdf":
             # Estimate page number based on chunk size (rough approximation)
