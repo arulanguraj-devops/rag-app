@@ -42,7 +42,11 @@ const ChatInput = ({ onSendMessage, isLoading, disabled }) => {
             className="chat-input"
             disabled={disabled}
             rows="1"
-            style={{ maxHeight: '120px', overflow: 'auto' }}
+            style={{ 
+              maxHeight: '120px', 
+              overflow: 'auto',
+              scrollbarColor: 'var(--scroll-thumb-color, #4B5563) var(--scroll-track-color, transparent)'
+            }}
           />
         </div>
         <button

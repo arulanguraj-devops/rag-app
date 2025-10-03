@@ -1,0 +1,27 @@
+/* Custom styles for scroll buttons in the chat input area */
+.dark .scroll-button {
+  background-color: #4B5563;
+  color: #E5E7EB;
+  border: none;
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dark .scroll-button:hover {
+  background-color: #6B7280;
+}
+
+/* Style all scroll buttons and similar UI elements in dark mode */
+.dark ::-webkit-scrollbar-button,
+.dark input::-webkit-inner-spin-button,
+.dark input::-webkit-outer-spin-button,
+.dark textarea::-webkit-inner-spin-button,
+.dark textarea::-webkit-outer-spin-button,
+.dark [role="spinbutton"],
+.dark [type="number"] {
+  filter: invert(0.8); /* This will invert the colors to make white buttons darker */
+}

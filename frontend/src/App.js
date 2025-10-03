@@ -5,6 +5,7 @@ import SettingsModal from './components/SettingsModal';
 import HelpModal from './components/HelpModal';
 import DocumentViewer from './components/DocumentViewer';
 import Header from './components/Header';
+import './components/ScrollButton.css';
 import { 
   getConversations, 
   createNewConversation, 

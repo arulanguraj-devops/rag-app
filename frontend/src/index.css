@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-button: #cbd5e1;
+}
+
+.dark {
+  --scrollbar-thumb: #4B5563;
+  --scrollbar-track: #1F2937;
+  --scrollbar-button: #4B5563;
+}
+
 @layer base {
   * {
     @apply border-gray-200;
@@ -85,6 +97,64 @@
   
   .dark .chat-input {
     @apply bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400;
+  }
+  
+  /* Specifically style the chat input scrollbar in dark mode */
+  .dark .chat-input::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .dark .chat-input::-webkit-scrollbar-track {
+    background: #374151;
+    border-radius: 4px;
+  }
+  
+  .dark .chat-input::-webkit-scrollbar-thumb {
+    background: #4B5563;
+    border-radius: 4px;
+  }
+  
+  .dark .chat-input::-webkit-scrollbar-thumb:hover {
+    background: #6B7280;
+  }
+  
+  /* Style for scrollbar in all modes */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 5px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-button);
+  }
+  
+  ::-webkit-scrollbar-button {
+    background-color: var(--scrollbar-button);
+    border-radius: 2px;
+  }
+  
+  /* Style input spinner buttons in all modes */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    background-color: var(--scrollbar-button);
+    color: var(--scrollbar-track);
+    opacity: 1;
+  }
+  
+  /* Fix for number inputs in dark mode */
+  .dark input[type="number"]::-webkit-inner-spin-button,
+  .dark input[type="number"]::-webkit-outer-spin-button {
+    filter: invert(0.8);
   }
   
   .send-button {
