@@ -1,9 +1,9 @@
 {
   "app": {
     "name": "Qurhealth HiTrust Policy Pilot",
-    "description": "AI-powered HR policy assistant ready to help",
+    "description": "AI-powered HiTrust policy assistant ready to help",
     "welcome_title": "Welcome to QurHealth Assistant",
-    "welcome_message": "Ask me anything about HR and IT polices related topics. I'm here to help with evidence-based information.",
+    "welcome_message": "Ask me anything about HiTrust policies. I'm here to help with reliable information.",
     "company": "QurHealth",
     "company_logo_url": "https://qurhealth.com/wp-content/uploads/2022/02/QurHealth_Logo.png",
     "chatbot_logo_url": "https://qurhealth.com/wp-content/uploads/2022/02/QurHealth_Logo.png",
