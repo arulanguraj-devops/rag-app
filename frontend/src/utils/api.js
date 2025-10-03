@@ -9,6 +9,28 @@ const getCredentials = () => {
   };
 };
 
+// Fetch with timeout to handle unresponsive API endpoints
+export const fetchWithTimeout = async (url, options = {}, timeout = 10000) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      ...getCredentials()
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout');
+    }
+    throw error;
+  }
+};
+
 export class APIError extends Error {
   constructor(message, status) {
     super(message);
@@ -28,14 +50,13 @@ export const streamChatResponse = async (query, chat_history, apiKey, onMessage,
       headers['X-API-Key'] = apiKey;
     }
     
-    const response = await fetch(`${API_BASE_URL}/ask`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/ask`, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify({
         query,
         chat_history
-      }),
-      ...getCredentials()
+      })
     });
 
     if (!response.ok) {

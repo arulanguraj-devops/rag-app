@@ -1,12 +1,14 @@
 import re
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends, Query
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional
 import os
 import logging
 import asyncio
 import json
+import uuid
 from queue import Queue
 from threading import Thread
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
@@ -16,6 +18,7 @@ from langchain_chroma import Chroma
 #local libs
 from libs.handler import SteamCustomHandler
 from libs.config import config_manager
+from libs.db import db_manager
 #from libs.vectordb import initialize_documents
 from libs.custom_logger import setup_logger
 
@@ -280,6 +283,27 @@ class QueryRequest(BaseModel):
     query: str
     chat_history: list
 
+class Message(BaseModel):
+    id: Optional[str] = None
+    content: str
+    role: str  # 'user' or 'assistant'
+    timestamp: Optional[str] = None
+    citations: Optional[List[Dict[str, Any]]] = None
+
+class Conversation(BaseModel):
+    id: str
+    title: str
+    timestamp: str
+    updated_at: Optional[str] = None
+    messages: List[Message]
+
+class ConversationRequest(BaseModel):
+    conversation: Conversation
+    client_user_id: Optional[str] = None
+
+class UserIdRequest(BaseModel):
+    client_user_id: Optional[str] = None
+
 async def verify_api_key(
     x_api_key: str = Header(None),
     x_amzn_oidc_data: str = Header(None),
@@ -365,6 +389,287 @@ async def get_user_info(
         return {
             "authenticated": False,
             "auth_method": "unknown",
+            "error": str(e)
+        }
+
+@app.post('/user-id')
+async def get_or_create_user_id(
+    request: UserIdRequest,
+    x_api_key: str = Header(None),
+    x_amzn_oidc_identity: str = Header(None)
+):
+    """
+    This endpoint needs to be available without prior authentication 
+    to allow the initial check of centralized history status
+    """
+    try:
+        # Check if centralized history is enabled
+        if not config_manager.is_centralized_history_enabled():
+            return {
+                "success": True,
+                "centralized_history_enabled": False,
+                "client_user_id": request.client_user_id or str(uuid.uuid4())
+            }
+        
+        # Return info about centralized history, but require auth for actual user_id
+        if not x_api_key and not x_amzn_oidc_identity:
+            return {
+                "success": True,
+                "centralized_history_enabled": True,
+                "needs_authentication": True,
+                "message": "Authentication required for centralized history"
+            }
+        
+        # Verify API key if provided
+        if x_api_key and x_api_key != API_KEY:
+            return {
+                "success": False,
+                "centralized_history_enabled": True,
+                "error": "Invalid API key"
+            }
+            
+        # Determine user identifier based on auth method
+        user_id = None
+        
+        # If ALB authenticated, use the ALB identity
+        if x_amzn_oidc_identity:
+            user_id = db_manager.get_or_create_user(
+                api_key=None, 
+                user_identity=x_amzn_oidc_identity
+            )
+        # Otherwise use the API key
+        elif x_api_key:
+            user_id = db_manager.get_or_create_user(
+                api_key=x_api_key,
+                user_identity=None
+            )
+            
+        return {
+            "success": True,
+            "centralized_history_enabled": True,
+            "user_id": user_id
+        }
+    except Exception as e:
+        logging.error(f"Error creating/retrieving user ID: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.get('/history/conversations', dependencies=[Depends(verify_api_key)])
+async def get_conversations(
+    client_user_id: str = Query(None),
+    limit: int = Query(50),
+    x_api_key: str = Header(None),
+    x_amzn_oidc_identity: str = Header(None)
+):
+    """Get conversations for the current user"""
+    try:
+        # Check if centralized history is enabled
+        if not config_manager.is_centralized_history_enabled():
+            return {
+                "success": True,
+                "centralized_history_enabled": False,
+                "conversations": []
+            }
+        
+        # Determine user ID based on auth method
+        user_id = None
+        if x_amzn_oidc_identity:
+            user_id = db_manager.get_or_create_user(
+                api_key=None, 
+                user_identity=x_amzn_oidc_identity
+            )
+        elif x_api_key and client_user_id:
+            user_id = client_user_id
+        else:
+            raise HTTPException(status_code=400, detail="Missing client_user_id")
+            
+        # Get conversations for this user
+        conversations = db_manager.get_conversations(user_id, limit)
+        
+        return {
+            "success": True,
+            "centralized_history_enabled": True,
+            "conversations": conversations
+        }
+    except Exception as e:
+        logging.error(f"Error retrieving conversations: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.get('/history/conversation/{conversation_id}', dependencies=[Depends(verify_api_key)])
+async def get_conversation(
+    conversation_id: str,
+    client_user_id: str = Query(None),
+    x_api_key: str = Header(None),
+    x_amzn_oidc_identity: str = Header(None)
+):
+    """Get a specific conversation by ID"""
+    try:
+        # Check if centralized history is enabled
+        if not config_manager.is_centralized_history_enabled():
+            return {
+                "success": True,
+                "centralized_history_enabled": False,
+                "conversation": None
+            }
+        
+        # Determine user ID based on auth method
+        user_id = None
+        if x_amzn_oidc_identity:
+            user_id = db_manager.get_or_create_user(
+                api_key=None, 
+                user_identity=x_amzn_oidc_identity
+            )
+        elif x_api_key and client_user_id:
+            user_id = client_user_id
+        else:
+            raise HTTPException(status_code=400, detail="Missing client_user_id")
+            
+        # Get the conversation
+        conversation = db_manager.get_conversation(conversation_id, user_id)
+        
+        if not conversation:
+            return {
+                "success": False,
+                "error": "Conversation not found"
+            }
+        
+        return {
+            "success": True,
+            "conversation": conversation
+        }
+    except Exception as e:
+        logging.error(f"Error retrieving conversation: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.post('/history/conversation', dependencies=[Depends(verify_api_key)])
+async def save_conversation(
+    request: ConversationRequest,
+    x_api_key: str = Header(None),
+    x_amzn_oidc_identity: str = Header(None)
+):
+    """Save or update a conversation"""
+    try:
+        # Check if centralized history is enabled
+        if not config_manager.is_centralized_history_enabled():
+            return {
+                "success": True,
+                "centralized_history_enabled": False
+            }
+        
+        # Determine user ID based on auth method
+        user_id = None
+        if x_amzn_oidc_identity:
+            user_id = db_manager.get_or_create_user(
+                api_key=None, 
+                user_identity=x_amzn_oidc_identity
+            )
+        elif x_api_key and request.client_user_id:
+            user_id = request.client_user_id
+        else:
+            raise HTTPException(status_code=400, detail="Missing client_user_id")
+            
+        # Save the conversation
+        success = db_manager.save_conversation(
+            request.conversation.dict(),
+            user_id
+        )
+        
+        return {
+            "success": success
+        }
+    except Exception as e:
+        logging.error(f"Error saving conversation: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.delete('/history/conversation/{conversation_id}', dependencies=[Depends(verify_api_key)])
+async def delete_conversation(
+    conversation_id: str,
+    client_user_id: str = Query(None),
+    x_api_key: str = Header(None),
+    x_amzn_oidc_identity: str = Header(None)
+):
+    """Delete a conversation"""
+    try:
+        # Check if centralized history is enabled
+        if not config_manager.is_centralized_history_enabled():
+            return {
+                "success": True,
+                "centralized_history_enabled": False
+            }
+        
+        # Determine user ID based on auth method
+        user_id = None
+        if x_amzn_oidc_identity:
+            user_id = db_manager.get_or_create_user(
+                api_key=None, 
+                user_identity=x_amzn_oidc_identity
+            )
+        elif x_api_key and client_user_id:
+            user_id = client_user_id
+        else:
+            raise HTTPException(status_code=400, detail="Missing client_user_id")
+            
+        # Delete the conversation
+        success = db_manager.delete_conversation(conversation_id, user_id)
+        
+        return {
+            "success": success
+        }
+    except Exception as e:
+        logging.error(f"Error deleting conversation: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.delete('/history/conversations', dependencies=[Depends(verify_api_key)])
+async def clear_all_conversations(
+    client_user_id: str = Query(None),
+    x_api_key: str = Header(None),
+    x_amzn_oidc_identity: str = Header(None)
+):
+    """Clear all conversations for the current user"""
+    try:
+        # Check if centralized history is enabled
+        if not config_manager.is_centralized_history_enabled():
+            return {
+                "success": True,
+                "centralized_history_enabled": False
+            }
+        
+        # Determine user ID based on auth method
+        user_id = None
+        if x_amzn_oidc_identity:
+            user_id = db_manager.get_or_create_user(
+                api_key=None, 
+                user_identity=x_amzn_oidc_identity
+            )
+        elif x_api_key and client_user_id:
+            user_id = client_user_id
+        else:
+            raise HTTPException(status_code=400, detail="Missing client_user_id")
+            
+        # Clear all conversations
+        success = db_manager.clear_all_conversations(user_id)
+        
+        return {
+            "success": success
+        }
+    except Exception as e:
+        logging.error(f"Error clearing conversations: {e}")
+        return {
+            "success": False,
             "error": str(e)
         }
 

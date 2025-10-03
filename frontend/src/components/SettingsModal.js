@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, TestTube, CheckCircle, XCircle, Loader2, Trash2 } from 'lucide-react';
-import { getSettings, saveSettings, clearAllConversations } from '../utils/storage';
+import { getSettings, saveSettings, clearAllConversations, initializeStorageProvider } from '../utils/storageProvider';
 import { testApiConnection } from '../utils/api';
 
 const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
@@ -65,12 +65,19 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
     setIsSaving(true);
     
     try {
+      const trimmedApiKey = settings.apiKey.trim();
       const success = saveSettings({
         ...settings,
-        apiKey: settings.apiKey.trim()
+        apiKey: trimmedApiKey
       });
       
       if (success) {
+        // Reinitialize storage provider with new API key
+        if (appConfig) {
+          const baseUrl = appConfig.api?.base_url || 'http://localhost:8000';
+          await initializeStorageProvider(appConfig, trimmedApiKey, baseUrl);
+        }
+        
         onSettingsUpdate(settings);
         onClose();
       } else {
@@ -207,7 +214,7 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
                       Clear All Chat History
                     </h4>
                     <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-3">
-                      This will permanently delete all conversations and messages stored in your browser. This action cannot be undone.
+                      This will permanently delete all conversations and messages. This action cannot be undone.
                     </p>
                     
                     {!showClearConfirm ? (

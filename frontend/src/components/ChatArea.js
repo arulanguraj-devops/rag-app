@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Message from './Message';
 import ChatInput from './ChatInput';
 import { streamChatResponse, APIError } from '../utils/api';
-import { addMessageToConversation } from '../utils/storage';
+import { addMessageToConversation } from '../utils/chatUtils';
 import { AlertCircle } from 'lucide-react';
 
 const ChatArea = ({ 
@@ -24,18 +24,25 @@ const ChatArea = ({
 
   // Load messages when conversation changes
   useEffect(() => {
+    console.log('Conversation change detected:', conversation?.id);
+    
     if (conversation?.messages) {
       console.log('Loading messages:', conversation.messages.map(m => ({ 
         id: m.id, 
         type: m.type, 
+        content_preview: m.content?.substring(0, 30) + '...',
         citationsCount: m.citations ? m.citations.length : 0 
       })));
-      setMessages(conversation.messages);
+      
+      // Make a deep copy of the messages to avoid reference issues
+      const messagesCopy = conversation.messages.map(m => ({...m}));
+      setMessages(messagesCopy);
       setError(null);
     } else {
+      console.log('No messages in conversation or conversation is null');
       setMessages([]);
     }
-  }, [conversation?.id, conversation?.messages]);
+  }, [conversation?.id]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -62,11 +69,18 @@ const ChatArea = ({
       timestamp: new Date().toISOString()
     };
 
-    // Add user message immediately
-    const updatedConversation = addMessageToConversation(conversation.id, userMessage);
-    if (updatedConversation) {
-      setMessages(updatedConversation.messages);
-      onUpdateConversation(updatedConversation);
+    // IMPORTANT: Immediately add the message to the UI before any async operations
+    setMessages(prevMessages => [...prevMessages, userMessage]);
+
+    try {
+      // Save the message to storage
+      const updatedConversation = await addMessageToConversation(conversation.id, userMessage);
+      if (updatedConversation) {
+        onUpdateConversation(updatedConversation);
+      }
+    } catch (error) {
+      console.error('Error saving user message:', error);
+      // Message is already showing in UI, but might not be saved to storage
     }
 
     setIsLoading(true);
@@ -95,7 +109,7 @@ const ChatArea = ({
           setCurrentResponse(botResponseContent);
         },
         // onComplete
-        () => {
+        async () => {
           setIsTyping(false);
           setIsLoading(false);
           
@@ -110,10 +124,18 @@ const ChatArea = ({
 
             console.log('Saving bot message with citations:', botMessage);
 
-            const finalConversation = addMessageToConversation(conversation.id, botMessage);
-            if (finalConversation) {
-              setMessages(finalConversation.messages);
-              onUpdateConversation(finalConversation);
+            // IMPORTANT: Immediately add the bot message to UI before async operations
+            setMessages(prevMessages => [...prevMessages, botMessage]);
+
+            try {
+              // Then attempt to save to storage
+              const finalConversation = await addMessageToConversation(conversation.id, botMessage);
+              if (finalConversation) {
+                onUpdateConversation(finalConversation);
+              }
+            } catch (error) {
+              console.error('Error saving bot message:', error);
+              // Message is already showing in UI even if storage failed
             }
           }
           
@@ -163,7 +185,16 @@ const ChatArea = ({
     }
   };
 
-  const displayMessages = [...messages];
+  // Create a copy of messages to display
+  let displayMessages = [...messages];
+  
+  // For debugging
+  console.log('Current messages in state:', displayMessages.map(m => ({
+    id: m.id,
+    type: m.type,
+    content_length: m.content?.length || 0,
+    timestamp: m.timestamp
+  })));
   
   // Add typing indicator with current response
   if (isTyping) {

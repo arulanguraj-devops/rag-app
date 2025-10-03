@@ -9,8 +9,9 @@ import {
   createNewConversation, 
   deleteConversation, 
   getSettings,
-  saveConversation 
-} from './utils/storage';
+  saveConversation,
+  initializeStorageProvider
+} from './utils/storageProvider';
 import { testApiConnection, getUserInfo } from './utils/api';
 import { fetchAppConfig } from './utils/config';
 
@@ -53,13 +54,22 @@ function App() {
         };
         setSettings(mergedSettings);
         
-        const savedConversations = getConversations();
+        // Initialize storage provider based on config
+        const baseUrl = config.api?.base_url || 'http://localhost:8000';
+        await initializeStorageProvider(
+          config, 
+          mergedSettings.apiKey, 
+          baseUrl
+        );
+        
+        // Load conversations from selected storage provider
+        const savedConversations = await getConversations();
         setConversations(savedConversations);
         
         // If no conversations exist, create a default one
         if (savedConversations.length === 0) {
           const newConv = createNewConversation(null, null);
-          saveConversation(newConv);
+          await saveConversation(newConv);
           setConversations([newConv]);
           setCurrentConversation(newConv);
         } else {
@@ -142,15 +152,21 @@ function App() {
     }
   }, [appConfig]);
 
-  const handleNewConversation = () => {
+  const handleNewConversation = async () => {
     const newConv = createNewConversation(null, null);
-    saveConversation(newConv);
-    setConversations(prev => [newConv, ...prev]);
-    setCurrentConversation(newConv);
     
-    // Close sidebar on mobile after creating new conversation
-    if (window.innerWidth < 1024) {
-      setIsSidebarCollapsed(true);
+    try {
+      await saveConversation(newConv);
+      setConversations(prev => [newConv, ...prev]);
+      setCurrentConversation(newConv);
+      
+      // Close sidebar on mobile after creating new conversation
+      if (window.innerWidth < 1024) {
+        setIsSidebarCollapsed(true);
+      }
+    } catch (error) {
+      console.error('Error saving new conversation:', error);
+      alert('Failed to create new conversation. Please try again.');
     }
   };
 
@@ -163,28 +179,53 @@ function App() {
     }
   };
 
-  const handleDeleteConversation = (conversationId) => {
-    deleteConversation(conversationId);
-    const updatedConversations = conversations.filter(conv => conv.id !== conversationId);
-    setConversations(updatedConversations);
-    
-    // If we deleted the current conversation, select another one or create new
-    if (currentConversation?.id === conversationId) {
-      if (updatedConversations.length > 0) {
-        setCurrentConversation(updatedConversations[0]);
-      } else {
-        handleNewConversation();
+  const handleDeleteConversation = async (conversationId) => {
+    try {
+      await deleteConversation(conversationId);
+      const updatedConversations = conversations.filter(conv => conv.id !== conversationId);
+      setConversations(updatedConversations);
+      
+      // If we deleted the current conversation, select another one or create new
+      if (currentConversation?.id === conversationId) {
+        if (updatedConversations.length > 0) {
+          setCurrentConversation(updatedConversations[0]);
+        } else {
+          await handleNewConversation();
+        }
       }
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      alert('Failed to delete conversation. Please try again.');
     }
   };
 
-  const handleUpdateConversation = (updatedConversation) => {
-    setConversations(prev => 
-      prev.map(conv => 
-        conv.id === updatedConversation.id ? updatedConversation : conv
-      )
-    );
-    setCurrentConversation(updatedConversation);
+  const handleUpdateConversation = async (updatedConversation) => {
+    try {
+      console.log('Updating conversation in App.js:', updatedConversation);
+      
+      // First update UI state to ensure immediate feedback
+      setConversations(prev => {
+        const updated = prev.map(conv => 
+          conv.id === updatedConversation.id ? updatedConversation : conv
+        );
+        
+        // If conversation wasn't found, add it to the beginning
+        if (!prev.find(conv => conv.id === updatedConversation.id)) {
+          return [updatedConversation, ...prev];
+        }
+        
+        return updated;
+      });
+      
+      // Update current conversation reference
+      setCurrentConversation(updatedConversation);
+      
+      // Then save to storage (after UI is updated)
+      await saveConversation(updatedConversation);
+    } catch (error) {
+      console.error('Error updating conversation:', error);
+      // UI is already updated, even if storage fails
+    }
   };
 
   const handleSettingsUpdate = async (newSettings) => {
@@ -195,7 +236,27 @@ function App() {
       try {
         const result = await testApiConnection(newSettings.apiKey);
         setIsApiKeyValid(result.success);
+        
+        // If API key is valid and we have app config, reinitialize storage provider
+        if (result.success && appConfig) {
+          const baseUrl = appConfig.api?.base_url || 'http://localhost:8000';
+          await initializeStorageProvider(appConfig, newSettings.apiKey, baseUrl);
+          
+          // Reload conversations after storage provider change
+          const savedConversations = await getConversations();
+          setConversations(savedConversations);
+          
+          if (savedConversations.length > 0) {
+            setCurrentConversation(savedConversations[0]);
+          } else {
+            const newConv = createNewConversation();
+            await saveConversation(newConv);
+            setConversations([newConv]);
+            setCurrentConversation(newConv);
+          }
+        }
       } catch (error) {
+        console.error('Error testing connection:', error);
         setIsApiKeyValid(false);
       }
     } else {

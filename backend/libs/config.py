@@ -83,6 +83,13 @@ class ConfigManager:
             },
             "logging": {
                 "level": "INFO"
+            },
+            "storage": {
+                "type": "local",
+                "sqlite": {
+                    "db_path": "data/history.db",
+                    "user_id_prefix": "user_"
+                }
             }
         }
     
@@ -129,6 +136,21 @@ class ConfigManager:
     def get_log_level(self) -> str:
         """Get logging level from configuration"""
         return self.get_value("logging", "level", "INFO")
+    
+    def get_storage_type(self):
+        """Get the storage type from configuration"""
+        storage = self.get_section("storage")
+        return storage.get("type", "local")
+    
+    def is_centralized_history_enabled(self):
+        """Check if centralized history is enabled"""
+        features = self.get_section("features")
+        return features.get("centralized_history", False)
+    
+    def get_sqlite_config(self):
+        """Get the SQLite database configuration"""
+        storage = self.get_section("storage")
+        return storage.get("sqlite", {"db_path": "data/history.db"})
     
     def reload_config(self):
         """Reload configuration from file"""

@@ -37,7 +37,8 @@ rag-app/
 ### Frontend
 - 💬 **Modern Chat UI**: Sleek, responsive chat interface
 - 📱 **Mobile Responsive**: Works on all device sizes
-- 💾 **Local Storage**: Conversation history stored locally
+- �️ **Dual Storage System**: Support for both local storage and centralized SQLite storage
+- 🔄 **User ID Management**: Automatic user tracking for multi-device access
 - 🎨 **Markdown Support**: Rich text rendering for AI responses
 - ⚙️ **Easy Configuration**: Simple settings management
 - 🔄 **Real-time Updates**: Live streaming of AI responses
@@ -164,8 +165,31 @@ REACT_APP_API_URL=http://127.0.0.1:8000
 1. **New Conversation**: Click "New Chat" to start fresh
 2. **Message Input**: Type your question and press Enter
 3. **Streaming Response**: Watch the AI response appear in real-time
-4. **History Management**: All conversations are saved locally
+4. **History Management**: Conversations are saved locally or in a central database
 5. **Settings**: Configure API keys and preferences
+
+### Storage Configuration
+The application supports two storage modes for chat history:
+
+1. **Local Storage (Default)**
+   - Conversations are stored in the browser's localStorage
+   - History is device-specific
+   - No server-side storage requirements
+   - Set `features.centralized_history: false` in config.json
+
+2. **Centralized SQLite Storage**
+   - Conversations are stored in a SQLite database on the server
+   - History is synchronized across all devices for the same user
+   - For API key authentication: Generates and maintains a unique user ID
+   - For AWS ALB authentication: Uses the user identity from ALB headers
+   - Set `features.centralized_history: true` in config.json
+
+SQLite database schema:
+```
+- users: User records with authentication information
+- conversations: Chat conversation metadata
+- messages: Individual messages in conversations
+```
 
 ### API Usage
 You can also interact with the backend directly:
@@ -196,6 +220,83 @@ Stream chat responses from the RAG system.
   "chat_history": []
 }
 ```
+
+### POST `/user-id`
+Get or create a user ID for history management.
+
+**Headers:**
+- `X-API-Key`: Your API key
+- `Content-Type`: application/json
+
+**Body:**
+```json
+{
+  "client_user_id": "optional_existing_id"
+}
+```
+
+### GET `/history/conversations`
+Get all conversations for the current user.
+
+**Headers:**
+- `X-API-Key`: Your API key
+
+**Query Parameters:**
+- `client_user_id`: The client-side user ID
+- `limit`: Maximum number of conversations to return (default: 50)
+
+### GET `/history/conversation/{conversation_id}`
+Get a specific conversation.
+
+**Headers:**
+- `X-API-Key`: Your API key
+
+**Query Parameters:**
+- `client_user_id`: The client-side user ID
+
+### POST `/history/conversation`
+Save or update a conversation.
+
+**Headers:**
+- `X-API-Key`: Your API key
+- `Content-Type`: application/json
+
+**Body:**
+```json
+{
+  "conversation": {
+    "id": "conversation_id",
+    "title": "Conversation Title",
+    "timestamp": "2025-10-03T12:00:00Z",
+    "messages": [
+      {
+        "content": "Hello, how can I help?",
+        "role": "assistant",
+        "timestamp": "2025-10-03T12:00:00Z"
+      }
+    ]
+  },
+  "client_user_id": "user_id"
+}
+```
+
+### DELETE `/history/conversation/{conversation_id}`
+Delete a specific conversation.
+
+**Headers:**
+- `X-API-Key`: Your API key
+
+**Query Parameters:**
+- `client_user_id`: The client-side user ID
+
+### DELETE `/history/conversations`
+Clear all conversations for the current user.
+
+**Headers:**
+- `X-API-Key`: Your API key
+
+**Query Parameters:**
+- `client_user_id`: The client-side user ID
 
 ### GET `/config`
 Get application configuration for frontend.
