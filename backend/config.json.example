@@ -20,6 +20,16 @@
     "theme_selection_enabled": true,
     "centralized_history": true
   },
+  "domain_mapping": {
+    "askme.vsolgmi.com": {
+      "datastore_key": "qurhealth",
+      "db_path": "data/askme_history.db"
+    },
+    "127.0.0.1:8000": {
+      "datastore_key": "test",
+      "db_path": "data/localhost_history.db"
+    }
+  },
   "defaults": {
     "datastore_key": "test",
     "theme": "light",
