@@ -58,7 +58,12 @@ function App() {
         console.log('Centralized history setting:', config.features?.centralized_history);
         
         // Initialize storage provider based on config and authentication status
-        const baseUrl = config.api?.base_url || 'http://localhost:8000';
+        // Use the same API_BASE_URL from the environment that the rest of the app uses
+        const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000';
+        // Only use config.api.base_url as a fallback if it exists and API_BASE_URL is not set
+        const baseUrl = apiBaseUrl || config.api?.base_url || 'http://127.0.0.1:8000';
+        console.log('Using API base URL for storage provider:', baseUrl);
+        
         const storageInitResult = await initializeStorageProvider(
           config, 
           mergedSettings.apiKey, 

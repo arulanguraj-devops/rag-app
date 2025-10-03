@@ -1,6 +1,8 @@
 // Configuration API utilities
 
+// Use the REACT_APP_API_URL from .env file
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000';
+console.log('Config loading from API Base URL:', API_BASE_URL);
 
 export class ConfigError extends Error {
   constructor(message, status) {

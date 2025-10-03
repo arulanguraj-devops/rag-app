@@ -1,6 +1,9 @@
 // API utilities for communicating with the RAG backend
 
+// Use the REACT_APP_API_URL from .env file
+// If not available, default to localhost for development
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000';
+console.log('API Base URL:', API_BASE_URL);
 
 // Function to get credentials to include with every request
 const getCredentials = () => {

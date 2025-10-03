@@ -243,8 +243,12 @@ class ServerStorageProvider extends StorageProvider {
       headers['X-API-Key'] = this.apiKey;
     }
 
+    // Log the full URL for debugging
+    const fullUrl = `${this.baseUrl}${endpoint}`;
+    console.log(`Making request to: ${fullUrl}`);
+    
     // Make the request with credentials included (important for ALB auth cookies)
-    const response = await fetchWithTimeout(`${this.baseUrl}${endpoint}`, {
+    const response = await fetchWithTimeout(fullUrl, {
       ...options,
       headers: {
         ...headers,
