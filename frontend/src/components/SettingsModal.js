@@ -304,16 +304,6 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
               </div>
             </div>
           )}
-
-          {/* Backend Information */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Backend Information</h3>
-            <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
-              <p><strong>API URL:</strong> http://127.0.0.1:8000</p>
-              <p><strong>Endpoint:</strong> POST /ask</p>
-              <p><strong>Protocol:</strong> Server-Sent Events (SSE)</p>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
