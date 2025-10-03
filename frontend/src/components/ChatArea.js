@@ -42,7 +42,9 @@ const ChatArea = ({
       console.log('No messages in conversation or conversation is null');
       setMessages([]);
     }
-  }, [conversation?.id]);
+  // Include conversation.messages in the dependency array to satisfy ESLint
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation?.id, conversation?.messages]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
