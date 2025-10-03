@@ -12,6 +12,27 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
   const [connectionStatus, setConnectionStatus] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [initialSettings, setInitialSettings] = useState(null);
+  const [userInfo, setUserInfo] = useState(null);
+  
+  // Determine if AWS ALB OIDC auth is being used
+  const isUsingOidcAuth = userInfo?.authenticated && userInfo?.auth_method === 'aws_alb_oidc';
+
+  // Fetch user info on mount
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const { getUserInfo } = await import('../utils/api');
+        const userInfoResponse = await getUserInfo();
+        if (userInfoResponse.success && userInfoResponse.data) {
+          setUserInfo(userInfoResponse.data);
+        }
+      } catch (error) {
+        console.error('Error fetching user info:', error);
+      }
+    };
+    fetchUserInfo();
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -21,6 +42,7 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
         theme: currentSettings.theme || appConfig?.defaults?.theme || 'light'
       };
       setSettings(mergedSettings);
+      setInitialSettings(mergedSettings);
       setConnectionStatus(null);
     }
   }, [isOpen, appConfig]);
@@ -34,6 +56,15 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
     if (field === 'apiKey') {
       setConnectionStatus(null);
     }
+  };
+  
+  // Check if settings have changed to enable save button
+  const hasSettingsChanged = () => {
+    if (!initialSettings) return false;
+    return (
+      settings.theme !== initialSettings.theme || 
+      (!isUsingOidcAuth && settings.apiKey !== initialSettings.apiKey)
+    );
   };
 
   const handleTestConnection = async () => {
@@ -65,20 +96,23 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
     setIsSaving(true);
     
     try {
-      const trimmedApiKey = settings.apiKey.trim();
-      const success = saveSettings({
+      // If using OIDC auth, don't require API key
+      const trimmedApiKey = isUsingOidcAuth ? '' : settings.apiKey.trim();
+      const settingsToSave = {
         ...settings,
         apiKey: trimmedApiKey
-      });
+      };
+      
+      const success = saveSettings(settingsToSave);
       
       if (success) {
-        // Reinitialize storage provider with new API key
+        // Reinitialize storage provider with new settings
         if (appConfig) {
           const baseUrl = appConfig.api?.base_url || 'http://localhost:8000';
           await initializeStorageProvider(appConfig, trimmedApiKey, baseUrl);
         }
         
-        onSettingsUpdate(settings);
+        onSettingsUpdate(settingsToSave);
         onClose();
       } else {
         alert('Failed to save settings. Please try again.');
@@ -124,61 +158,81 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
         </div>
 
         {/* Content */}
+                {/* Content */}
         <div className="p-6 space-y-6">
-          {/* API Key */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              API Key *
-            </label>
-            <input
-              type="password"
-              value={settings.apiKey}
-              onChange={(e) => handleInputChange('apiKey', e.target.value)}
-              placeholder="Enter your API key"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Required to authenticate with the QurHealth backend
-            </p>
-            
-            {/* Connection Test */}
-            <div className="mt-3 flex items-center space-x-3">
-              <button
-                onClick={handleTestConnection}
-                disabled={isTestingConnection || !settings.apiKey.trim()}
-                className="flex items-center space-x-2 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isTestingConnection ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <TestTube size={16} />
-                )}
-                <span>Test Connection</span>
-              </button>
+          {/* API Key - only show if not using OIDC auth */}
+          {!isUsingOidcAuth && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                API Key *
+              </label>
+              <input
+                type="password"
+                value={settings.apiKey}
+                onChange={(e) => handleInputChange('apiKey', e.target.value)}
+                placeholder="Enter your API key"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Required to authenticate with the QurHealth backend
+              </p>
               
-              {connectionStatus && (
-                <div className="flex items-center space-x-1">
-                  {connectionStatus.success ? (
-                    <>
-                      <CheckCircle size={16} className="text-green-500" />
-                      <span className="text-sm text-green-600">Connected</span>
-                    </>
+              {/* Connection Test */}
+              <div className="mt-3 flex items-center space-x-3">
+                <button
+                  onClick={handleTestConnection}
+                  disabled={isTestingConnection || !settings.apiKey.trim()}
+                  className="flex items-center space-x-2 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isTestingConnection ? (
+                    <Loader2 size={16} className="animate-spin" />
                   ) : (
-                    <>
-                      <XCircle size={16} className="text-red-500" />
-                      <span className="text-sm text-red-600">Failed</span>
-                    </>
+                    <TestTube size={16} />
                   )}
-                </div>
+                  <span>Test Connection</span>
+                </button>
+                
+                {connectionStatus && (
+                  <div className="flex items-center space-x-1">
+                    {connectionStatus.success ? (
+                      <>
+                        <CheckCircle size={16} className="text-green-500" />
+                        <span className="text-sm text-green-600">Connected</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle size={16} className="text-red-500" />
+                        <span className="text-sm text-red-600">Failed</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {connectionStatus && !connectionStatus.success && (
+                <p className="text-xs text-red-600 mt-1">
+                  {connectionStatus.message}
+                </p>
               )}
             </div>
-            
-            {connectionStatus && !connectionStatus.success && (
-              <p className="text-xs text-red-600 mt-1">
-                {connectionStatus.message}
-              </p>
-            )}
-          </div>
+          )}
+
+          {/* Authentication notice when using OIDC */}
+          {isUsingOidcAuth && (
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+              <div className="flex items-start space-x-3">
+                <CheckCircle size={20} className="text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="text-sm font-medium text-green-800 dark:text-green-200">
+                    Using AWS ALB OIDC Authentication
+                  </h4>
+                  <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                    You're authenticated through AWS Application Load Balancer. No API key required.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Theme */}
           {appConfig?.features?.theme_selection_enabled && (
@@ -272,7 +326,7 @@ const SettingsModal = ({ isOpen, onClose, onSettingsUpdate, appConfig }) => {
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving || !settings.apiKey.trim()}
+            disabled={isSaving || (!isUsingOidcAuth && !settings.apiKey.trim()) || !hasSettingsChanged()}
             className="flex items-center space-x-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isSaving ? (
