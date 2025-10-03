@@ -74,19 +74,29 @@ function App() {
         
         console.log('Storage provider initialized:', storageInitResult);
         
-        // Load conversations from selected storage provider
+        // Load conversations from selected storage provider for history
         const savedConversations = await getConversations();
-        setConversations(savedConversations);
         
-        // If no conversations exist, create a default one
-        if (savedConversations.length === 0) {
-          const newConv = createNewConversation(null, null);
-          await saveConversation(newConv);
+        // Filter out empty conversations
+        const nonEmptyConversations = savedConversations.filter(
+          conv => conv.messages && conv.messages.length > 0
+        );
+        
+        // Create a fresh conversation for the new session
+        const newConv = createNewConversation(null, null);
+        
+        // Only save the new conversation in memory for now, don't persist it
+        // It will be saved once a message is sent
+        
+        // Set the conversations list
+        if (nonEmptyConversations.length === 0) {
           setConversations([newConv]);
-          setCurrentConversation(newConv);
         } else {
-          setCurrentConversation(savedConversations[0]);
+          setConversations([newConv, ...nonEmptyConversations]);
         }
+        
+        // Always set the current conversation to the new one
+        setCurrentConversation(newConv);
         
         // Test connection - either with API key or ALB authentication
         try {
@@ -168,7 +178,8 @@ function App() {
     const newConv = createNewConversation(null, null);
     
     try {
-      await saveConversation(newConv);
+      // Don't save the conversation to storage yet - only add it to the state
+      // It will be saved when the first message is added
       setConversations(prev => [newConv, ...prev]);
       setCurrentConversation(newConv);
       
@@ -177,7 +188,7 @@ function App() {
         setIsSidebarCollapsed(true);
       }
     } catch (error) {
-      console.error('Error saving new conversation:', error);
+      console.error('Error creating new conversation:', error);
       alert('Failed to create new conversation. Please try again.');
     }
   };
@@ -195,15 +206,22 @@ function App() {
     try {
       await deleteConversation(conversationId);
       const updatedConversations = conversations.filter(conv => conv.id !== conversationId);
-      setConversations(updatedConversations);
       
       // If we deleted the current conversation, select another one or create new
       if (currentConversation?.id === conversationId) {
         if (updatedConversations.length > 0) {
+          // Set to another existing conversation
           setCurrentConversation(updatedConversations[0]);
+          setConversations(updatedConversations);
         } else {
-          await handleNewConversation();
+          // Create a new conversation but don't save it yet
+          const newConv = createNewConversation(null, null);
+          setConversations([newConv]);
+          setCurrentConversation(newConv);
         }
+      } else {
+        // Just update the list if we didn't delete the current conversation
+        setConversations(updatedConversations);
       }
     } catch (error) {
       console.error('Error deleting conversation:', error);
@@ -232,8 +250,11 @@ function App() {
       // Update current conversation reference
       setCurrentConversation(updatedConversation);
       
-      // Then save to storage (after UI is updated)
-      await saveConversation(updatedConversation);
+      // Only save conversations that have messages
+      if (updatedConversation.messages && updatedConversation.messages.length > 0) {
+        // Then save to storage (after UI is updated)
+        await saveConversation(updatedConversation);
+      }
     } catch (error) {
       console.error('Error updating conversation:', error);
       // UI is already updated, even if storage fails
