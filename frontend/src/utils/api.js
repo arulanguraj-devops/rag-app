@@ -130,21 +130,35 @@ export const testApiConnection = async (apiKey) => {
       headers['X-API-Key'] = apiKey;
     }
     
-    const response = await fetch(`${API_BASE_URL}/test-connection`, {
-      method: 'POST',
+    // Try to use the /health endpoint instead of /test-connection 
+    // This is more likely to work with ALB auth
+    const testEndpoint = '/health';
+    console.log(`Testing API connection to ${API_BASE_URL}${testEndpoint}`);
+    
+    const response = await fetch(`${API_BASE_URL}${testEndpoint}`, {
+      method: 'GET',
       headers: headers,
       ...getCredentials()
     });
 
+    console.log(`API test response: ${response.status} ${response.statusText}`);
+
     if (response.ok) {
       const data = await response.json();
+      console.log('API test data:', data);
+      
+      // Try to determine if we're using ALB auth or API key
+      const userInfoResponse = await getUserInfo();
+      const isAlbAuth = userInfoResponse?.data?.auth_method === 'aws_alb_oidc';
+      
       return {
         success: true,
         status: response.status,
         message: data.message || 'Connection successful',
-        auth_method: data.auth_method || 'unknown'
+        auth_method: isAlbAuth ? 'aws_alb_oidc' : 'api_key'
       };
     } else {
+      console.error(`API test failed: HTTP ${response.status}`);
       return {
         success: false,
         status: response.status,
@@ -152,6 +166,7 @@ export const testApiConnection = async (apiKey) => {
       };
     }
   } catch (error) {
+    console.error('API test error:', error);
     return {
       success: false,
       status: null,

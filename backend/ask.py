@@ -328,9 +328,32 @@ async def verify_api_key(
         raise HTTPException(status_code=403, detail="Forbidden: Invalid API Key")
 
 @app.get('/health')
-async def health_check():
-    """Simple health check endpoint for API key validation"""
-    return {"status": "healthy", "message": "API is working"}
+async def health_check(
+    x_amzn_oidc_data: str = Header(None),
+    x_amzn_oidc_identity: str = Header(None),
+    x_api_key: str = Header(None)
+):
+    """Enhanced health check endpoint that works with both API key and ALB auth"""
+    
+    # Check for ALB authentication headers
+    is_alb_auth = x_amzn_oidc_data is not None and x_amzn_oidc_identity is not None
+    is_api_key_valid = x_api_key == API_KEY if x_api_key else False
+    
+    response = {
+        "status": "healthy",
+        "message": "API is working",
+        "auth_method": "unknown"
+    }
+    
+    if is_alb_auth:
+        response["auth_method"] = "aws_alb_oidc"
+    elif is_api_key_valid:
+        response["auth_method"] = "api_key"
+    
+    # Check if centralized history is enabled
+    response["centralized_history_enabled"] = config_manager.is_centralized_history_enabled()
+    
+    return response
 
 @app.get('/user-info')
 async def get_user_info(
@@ -578,7 +601,7 @@ async def save_conversation(
             
         # Save the conversation
         success = db_manager.save_conversation(
-            request.conversation.dict(),
+            request.conversation.model_dump(),  # Updated from dict() to model_dump()
             user_id
         )
         

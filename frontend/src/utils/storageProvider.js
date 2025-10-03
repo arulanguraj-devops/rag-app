@@ -178,13 +178,30 @@ class ServerStorageProvider extends StorageProvider {
       // Try to get user ID from local storage
       this.userId = localStorage.getItem('server_user_id');
 
+      // Check if we're using ALB authentication
+      let isAlbAuthenticated = false;
+      try {
+        const { getUserInfo } = await import('./api');
+        const userInfoResponse = await getUserInfo();
+        if (userInfoResponse.success && userInfoResponse.data?.authenticated && 
+            userInfoResponse.data?.auth_method === 'aws_alb_oidc') {
+          isAlbAuthenticated = true;
+          console.log('Using AWS ALB OIDC authentication');
+        }
+      } catch (error) {
+        console.error('Error checking ALB authentication:', error);
+      }
+
       // Always check with the server to verify centralized history is enabled
+      console.log('Checking centralized history with server...');
       const response = await this.fetchFromServer('/user-id', {
         method: 'POST',
         body: JSON.stringify({
           client_user_id: this.userId || null
         })
       });
+      
+      console.log('Server response for user-id:', response);
 
       // If centralized history is not enabled, throw an error to fall back to local storage
       if (!response.centralized_history_enabled) {
@@ -192,7 +209,7 @@ class ServerStorageProvider extends StorageProvider {
       }
 
       // If we need authentication but don't have it yet
-      if (response.needs_authentication) {
+      if (response.needs_authentication && !isAlbAuthenticated && !this.apiKey) {
         // We'll fall back to local storage until authenticated
         throw new Error('Authentication required for centralized history');
       }
@@ -201,11 +218,13 @@ class ServerStorageProvider extends StorageProvider {
       if (response.success && response.user_id) {
         this.userId = response.user_id;
         localStorage.setItem('server_user_id', this.userId);
+        console.log('Using server-provided user ID:', this.userId);
       } else if (!this.userId) {
         // No user ID provided or available
         throw new Error('No user ID available');
       }
 
+      console.log('Successfully initialized server storage with user ID:', this.userId);
       return this.userId;
     } catch (error) {
       console.error('Error initializing server storage:', error);
@@ -214,21 +233,32 @@ class ServerStorageProvider extends StorageProvider {
   }
 
   async fetchFromServer(endpoint, options = {}) {
+    // Initialize headers with Content-Type
     const headers = {
       'Content-Type': 'application/json',
-      'X-API-Key': this.apiKey,
     };
+    
+    // Only add API key if available
+    if (this.apiKey) {
+      headers['X-API-Key'] = this.apiKey;
+    }
 
+    // Make the request with credentials included (important for ALB auth cookies)
     const response = await fetchWithTimeout(`${this.baseUrl}${endpoint}`, {
       ...options,
       headers: {
         ...headers,
         ...(options.headers || {})
       },
+      credentials: 'include', // Important: Include credentials for ALB auth cookies
     });
+
+    // Log detailed debug info for troubleshooting
+    console.log(`Server request to ${endpoint}: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`Server error (${response.status}): ${errorText}`);
       throw new Error(`Server error (${response.status}): ${errorText}`);
     }
 
@@ -424,15 +454,30 @@ let storageProvider = null;
 export const initializeStorageProvider = async (appConfig, apiKey, baseUrl) => {
   const useCentralizedHistory = appConfig?.features?.centralized_history === true;
   
-  // If no API key is provided and centralized history is enabled, fall back to local storage
-  if (useCentralizedHistory && !apiKey) {
-    console.log('Centralized history enabled but no API key provided, using local storage');
-    currentProvider = 'local';
-    storageProvider = new LocalStorageProvider();
-  } else if (useCentralizedHistory) {
+  // Get the user info to check if ALB authentication is available
+  let isAlbAuthenticated = false;
+  try {
+    const { getUserInfo } = await import('./api');
+    const userInfoResponse = await getUserInfo();
+    if (userInfoResponse.success && userInfoResponse.data?.authenticated && 
+        userInfoResponse.data?.auth_method === 'aws_alb_oidc') {
+      isAlbAuthenticated = true;
+    }
+  } catch (error) {
+    console.error('Error checking ALB authentication:', error);
+  }
+  
+  // If centralized history is enabled and we have either API key OR ALB auth, use server storage
+  if (useCentralizedHistory && (apiKey || isAlbAuthenticated)) {
+    console.log(`Centralized history enabled with ${apiKey ? 'API key' : 'ALB'} authentication, using server storage`);
     currentProvider = 'server';
     storageProvider = new ServerStorageProvider(apiKey, baseUrl);
+  } else if (useCentralizedHistory && !apiKey && !isAlbAuthenticated) {
+    console.log('Centralized history enabled but no authentication available, falling back to local storage');
+    currentProvider = 'local';
+    storageProvider = new LocalStorageProvider();
   } else {
+    console.log('Using local storage (centralized history disabled)');
     currentProvider = 'local';
     storageProvider = new LocalStorageProvider();
   }

@@ -54,13 +54,18 @@ function App() {
         };
         setSettings(mergedSettings);
         
-        // Initialize storage provider based on config
+        console.log('User info from ALB:', userInfoResponse?.data);
+        console.log('Centralized history setting:', config.features?.centralized_history);
+        
+        // Initialize storage provider based on config and authentication status
         const baseUrl = config.api?.base_url || 'http://localhost:8000';
-        await initializeStorageProvider(
+        const storageInitResult = await initializeStorageProvider(
           config, 
           mergedSettings.apiKey, 
           baseUrl
         );
+        
+        console.log('Storage provider initialized:', storageInitResult);
         
         // Load conversations from selected storage provider
         const savedConversations = await getConversations();
