@@ -8,6 +8,7 @@ const Sidebar = ({
   onNewConversation, 
   onDeleteConversation, 
   onOpenSettings, 
+  onOpenHelp,
   isCollapsed, 
   onToggleCollapsed,
   appConfig,
@@ -195,7 +196,7 @@ const Sidebar = ({
 
         {/* Settings Button */}
         {appConfig?.features?.settings_enabled && (
-          <div className={`p-4 border-t border-gray-200 dark:border-gray-700 ${isCollapsed ? 'flex justify-center' : ''}`}>
+          <div className={`p-4 border-t border-gray-200 dark:border-gray-700 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
             <button
               onClick={onOpenSettings}
               className={`
@@ -209,6 +210,28 @@ const Sidebar = ({
             >
               <Settings size={isCollapsed ? 20 : 18} />
               {!isCollapsed && <span>Settings</span>}
+            </button>
+            
+            {/* Help Button */}
+            <button
+              onClick={onOpenHelp}
+              className={`
+                ${isCollapsed 
+                  ? 'w-10 h-10 flex items-center justify-center mt-3' 
+                  : 'w-full flex items-center space-x-2 px-4 py-3 justify-start mt-2'
+                }
+                rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300
+              `}
+              title="Help"
+            >
+              {isCollapsed ? (
+                <div className="flex items-center justify-center w-6 h-6 bg-gray-200 dark:bg-gray-600 rounded-full">
+                  <span className="font-bold text-gray-700 dark:text-gray-300 text-sm">?</span>
+                </div>
+              ) : (
+                <span className="font-bold text-lg">?</span>
+              )}
+              {!isCollapsed && <span>Help</span>}
             </button>
           </div>
         )}

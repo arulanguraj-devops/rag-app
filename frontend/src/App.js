@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import SettingsModal from './components/SettingsModal';
+import HelpModal from './components/HelpModal';
 import DocumentViewer from './components/DocumentViewer';
 import Header from './components/Header';
 import { 
@@ -19,6 +20,7 @@ function App() {
   const [conversations, setConversations] = useState([]);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [settings, setSettings] = useState({ apiKey: '', theme: 'light' });
   const [isApiKeyValid, setIsApiKeyValid] = useState(false);
   // Set sidebar collapsed by default (true) regardless of screen size
@@ -327,9 +329,11 @@ function App() {
             onNewConversation={handleNewConversation}
             onDeleteConversation={handleDeleteConversation}
             onOpenSettings={() => appConfig.features.settings_enabled && setIsSettingsOpen(true)}
+            onOpenHelp={() => setIsHelpOpen(true)}
             isCollapsed={isSidebarCollapsed}
             onToggleCollapsed={handleToggleSidebar}
             appConfig={appConfig}
+            userInfo={userInfo}
           />
         )}
         
@@ -363,6 +367,13 @@ function App() {
           appConfig={appConfig}
         />
       )}
+      
+      {/* Help Modal */}
+      <HelpModal
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        appConfig={appConfig}
+      />
     </div>
   );
 }

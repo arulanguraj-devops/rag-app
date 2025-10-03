@@ -31,7 +31,7 @@ const Header = ({
         
         {/* Company Name */}
         <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-          {appConfig?.app?.company || 'QurHealth'}
+          {appConfig?.app?.name || 'AI Assistant'}
         </h1>
       </div>
       

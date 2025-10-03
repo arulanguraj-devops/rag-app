@@ -209,3 +209,29 @@ export const getUserInfo = async () => {
     };
   }
 };
+
+// Function to get backend version information
+export const getBackendVersion = async () => {
+  try {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/version`);
+    
+    if (response.ok) {
+      return {
+        success: true,
+        data: await response.json()
+      };
+    } else {
+      return {
+        success: false,
+        status: response.status,
+        message: `HTTP ${response.status}`
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      status: null,
+      message: error.message
+    };
+  }
+};

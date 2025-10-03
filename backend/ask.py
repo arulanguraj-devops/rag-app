@@ -777,6 +777,14 @@ async def serve_document(file_path: str):
         logging.error(f"Error serving document {file_path}: {e}")
         raise HTTPException(status_code=500, detail="Error serving document")
 
+# Import version information
+from __version__ import get_version_info
+
+@app.get("/version", dependencies=[])
+async def get_version():
+    """Return version information about the backend."""
+    return get_version_info(config_manager)
+
 @app.post('/ask', dependencies=[Depends(verify_api_key)]) 
 async def stream(
     query_request: QueryRequest,

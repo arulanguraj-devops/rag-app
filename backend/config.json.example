@@ -1,12 +1,15 @@
 {
   "app": {
-    "name": "Ventech Assistant",
+    "name": "Qurhealth HiTrust Policy Pilot",
     "description": "AI-powered HR policy assistant ready to help",
-    "welcome_title": "Welcome to Ventech Assistant",
+    "welcome_title": "Welcome to QurHealth Assistant",
     "welcome_message": "Ask me anything about HR and IT polices related topics. I'm here to help with evidence-based information.",
-    "company": "VentechSolutions",
+    "company": "QurHealth",
     "company_logo_url": "https://qurhealth.com/wp-content/uploads/2022/02/QurHealth_Logo.png",
-    "chatbot_logo_url": "https://qurhealth.com/wp-content/uploads/2022/02/QurHealth_Logo.png"
+    "chatbot_logo_url": "https://qurhealth.com/wp-content/uploads/2022/02/QurHealth_Logo.png",
+    "support_email": "support@qurhealth.com",
+    "version": "1.0.1",
+    "about": "Simple RAG application developed by QurHealth for internal use."
   },
   "features": {
     "settings_enabled": true,
@@ -15,7 +18,7 @@
     "chat_history_enabled": true,
     "conversation_management_enabled": true,
     "theme_selection_enabled": true,
-    "centralized_history": false
+    "centralized_history": true
   },
   "defaults": {
     "datastore_key": "test",
@@ -55,7 +58,7 @@
     "level": "INFO"
   },
   "storage": {
-    "type": "local",
+    "type": "sqlite",
     "sqlite": {
       "db_path": "data/history.db",
       "user_id_prefix": "user_"
