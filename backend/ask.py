@@ -419,7 +419,8 @@ async def get_user_info(
 async def get_or_create_user_id(
     request: UserIdRequest,
     x_api_key: str = Header(None),
-    x_amzn_oidc_identity: str = Header(None)
+    x_amzn_oidc_identity: str = Header(None),
+    host: str = Header(None)
 ):
     """
     This endpoint needs to be available without prior authentication 
@@ -458,13 +459,15 @@ async def get_or_create_user_id(
         if x_amzn_oidc_identity:
             user_id = db_manager.get_or_create_user(
                 api_key=None, 
-                user_identity=x_amzn_oidc_identity
+                user_identity=x_amzn_oidc_identity,
+                host=host
             )
         # Otherwise use the API key
         elif x_api_key:
             user_id = db_manager.get_or_create_user(
                 api_key=x_api_key,
-                user_identity=None
+                user_identity=None,
+                host=host
             )
             
         return {
@@ -484,7 +487,8 @@ async def get_conversations(
     client_user_id: str = Query(None),
     limit: int = Query(50),
     x_api_key: str = Header(None),
-    x_amzn_oidc_identity: str = Header(None)
+    x_amzn_oidc_identity: str = Header(None),
+    host: str = Header(None)
 ):
     """Get conversations for the current user"""
     try:
@@ -501,15 +505,16 @@ async def get_conversations(
         if x_amzn_oidc_identity:
             user_id = db_manager.get_or_create_user(
                 api_key=None, 
-                user_identity=x_amzn_oidc_identity
+                user_identity=x_amzn_oidc_identity,
+                host=host
             )
         elif x_api_key and client_user_id:
             user_id = client_user_id
         else:
             raise HTTPException(status_code=400, detail="Missing client_user_id")
             
-        # Get conversations for this user
-        conversations = db_manager.get_conversations(user_id, limit)
+        # Get conversations for this user using domain-specific database if available
+        conversations = db_manager.get_conversations(user_id, limit, host)
         
         return {
             "success": True,
@@ -528,7 +533,8 @@ async def get_conversation(
     conversation_id: str,
     client_user_id: str = Query(None),
     x_api_key: str = Header(None),
-    x_amzn_oidc_identity: str = Header(None)
+    x_amzn_oidc_identity: str = Header(None),
+    host: str = Header(None)
 ):
     """Get a specific conversation by ID"""
     try:
@@ -545,7 +551,8 @@ async def get_conversation(
         if x_amzn_oidc_identity:
             user_id = db_manager.get_or_create_user(
                 api_key=None, 
-                user_identity=x_amzn_oidc_identity
+                user_identity=x_amzn_oidc_identity,
+                host=host
             )
         elif x_api_key and client_user_id:
             user_id = client_user_id
@@ -553,7 +560,7 @@ async def get_conversation(
             raise HTTPException(status_code=400, detail="Missing client_user_id")
             
         # Get the conversation
-        conversation = db_manager.get_conversation(conversation_id, user_id)
+        conversation = db_manager.get_conversation(conversation_id, user_id, host)
         
         if not conversation:
             return {
@@ -576,7 +583,8 @@ async def get_conversation(
 async def save_conversation(
     request: ConversationRequest,
     x_api_key: str = Header(None),
-    x_amzn_oidc_identity: str = Header(None)
+    x_amzn_oidc_identity: str = Header(None),
+    host: str = Header(None)
 ):
     """Save or update a conversation"""
     try:
@@ -592,17 +600,19 @@ async def save_conversation(
         if x_amzn_oidc_identity:
             user_id = db_manager.get_or_create_user(
                 api_key=None, 
-                user_identity=x_amzn_oidc_identity
+                user_identity=x_amzn_oidc_identity,
+                host=host
             )
         elif x_api_key and request.client_user_id:
             user_id = request.client_user_id
         else:
             raise HTTPException(status_code=400, detail="Missing client_user_id")
             
-        # Save the conversation
+        # Save the conversation using domain-specific database if available
         success = db_manager.save_conversation(
             request.conversation.model_dump(),  # Updated from dict() to model_dump()
-            user_id
+            user_id,
+            host
         )
         
         return {
@@ -620,7 +630,8 @@ async def delete_conversation(
     conversation_id: str,
     client_user_id: str = Query(None),
     x_api_key: str = Header(None),
-    x_amzn_oidc_identity: str = Header(None)
+    x_amzn_oidc_identity: str = Header(None),
+    host: str = Header(None)
 ):
     """Delete a conversation"""
     try:
@@ -636,7 +647,8 @@ async def delete_conversation(
         if x_amzn_oidc_identity:
             user_id = db_manager.get_or_create_user(
                 api_key=None, 
-                user_identity=x_amzn_oidc_identity
+                user_identity=x_amzn_oidc_identity,
+                host=host
             )
         elif x_api_key and client_user_id:
             user_id = client_user_id
@@ -644,7 +656,7 @@ async def delete_conversation(
             raise HTTPException(status_code=400, detail="Missing client_user_id")
             
         # Delete the conversation
-        success = db_manager.delete_conversation(conversation_id, user_id)
+        success = db_manager.delete_conversation(conversation_id, user_id, host)
         
         return {
             "success": success
@@ -660,7 +672,8 @@ async def delete_conversation(
 async def clear_all_conversations(
     client_user_id: str = Query(None),
     x_api_key: str = Header(None),
-    x_amzn_oidc_identity: str = Header(None)
+    x_amzn_oidc_identity: str = Header(None),
+    host: str = Header(None)
 ):
     """Clear all conversations for the current user"""
     try:
@@ -676,7 +689,8 @@ async def clear_all_conversations(
         if x_amzn_oidc_identity:
             user_id = db_manager.get_or_create_user(
                 api_key=None, 
-                user_identity=x_amzn_oidc_identity
+                user_identity=x_amzn_oidc_identity,
+                host=host
             )
         elif x_api_key and client_user_id:
             user_id = client_user_id
@@ -684,7 +698,7 @@ async def clear_all_conversations(
             raise HTTPException(status_code=400, detail="Missing client_user_id")
             
         # Clear all conversations
-        success = db_manager.clear_all_conversations(user_id)
+        success = db_manager.clear_all_conversations(user_id, host)
         
         return {
             "success": success
@@ -788,7 +802,8 @@ async def get_version():
 @app.post('/ask', dependencies=[Depends(verify_api_key)]) 
 async def stream(
     query_request: QueryRequest,
-    x_amzn_oidc_identity: str = Header(None)
+    x_amzn_oidc_identity: str = Header(None),
+    host: str = Header(None)
 ):  
     user_identifier = "API User"
     if x_amzn_oidc_identity:
@@ -797,8 +812,13 @@ async def stream(
         
     logging.info(f'Query received from {user_identifier}: {query_request.query}')
     
-    # Get datastore_key from configuration
+    # Get domain-specific config if available, otherwise use default
     datastore_key = config_manager.get_value("defaults", "datastore_key", "test")
+    if host:
+        domain_config = config_manager.get_domain_config(host)
+        if domain_config and "datastore_key" in domain_config:
+            datastore_key = domain_config["datastore_key"]
+            logging.info(f"Using domain-specific datastore: {datastore_key} for host: {host}")
     
     # Limit query length based on configuration
     max_query_length = config_manager.get_value("api", "max_query_length", 1000)

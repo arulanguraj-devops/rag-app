@@ -14,18 +14,37 @@ class DatabaseManager:
     """
     def __init__(self):
         self.db_config = config_manager.get_config().get("storage", {}).get("sqlite", {})
-        self.db_path = self.db_config.get("db_path", "data/history.db")
+        self.default_db_path = self.db_config.get("db_path", "data/history.db")
+        self.db_connections = {}
         
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-        
-        # Initialize database
-        self._init_database()
+                # Initialize default database
+        self._init_database(self.default_db_path)
     
-    def _init_database(self):
+    def get_db_path_for_host(self, host=None):
+        """
+        Get the database path for the specified host
+        
+        Args:
+            host (str): The host domain from the request
+            
+        Returns:
+            str: Path to the database for this host
+        """
+        if host:
+            domain_config = config_manager.get_domain_config(host)
+            if domain_config and "db_path" in domain_config:
+                return domain_config["db_path"]
+        
+        # Return default if no host-specific path found
+        return self.default_db_path
+    
+    def _init_database(self, db_path):
         """Initialize database tables if they don't exist"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+            
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
             
             # Create users table
@@ -64,23 +83,49 @@ class DatabaseManager:
             
             conn.commit()
             conn.close()
-            logger.info(f"Database initialized: {self.db_path}")
+            logger.info(f"Database initialized: {db_path}")
         except Exception as e:
             logger.error(f"Error initializing database: {e}")
             raise
     
-    def get_or_create_user(self, api_key=None, user_identity=None):
+    def get_connection(self, host=None):
+        """
+        Get database connection for the specified host
+        
+        Args:
+            host (str): The host domain from the request
+            
+        Returns:
+            sqlite3.Connection: Database connection
+        """
+        db_path = self.get_db_path_for_host(host)
+        
+        # Initialize this database if it hasn't been initialized yet
+        if db_path not in self.db_connections:
+            self._init_database(db_path)
+            self.db_connections[db_path] = sqlite3.connect(db_path)
+            
+        # If connection exists but is closed, create a new one
+        try:
+            self.db_connections[db_path].execute("SELECT 1")
+        except (sqlite3.ProgrammingError, sqlite3.OperationalError):
+            self.db_connections[db_path] = sqlite3.connect(db_path)
+            
+        return self.db_connections[db_path]
+    
+    def get_or_create_user(self, api_key=None, user_identity=None, host=None):
         """
         Get existing user or create a new one
         
         Args:
             api_key (str): API key for authentication
             user_identity (str): User identity from AWS ALB
+            host (str): The host domain from the request
             
         Returns:
             str: User ID
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection(host)
         cursor = conn.cursor()
         user_id = None
         
@@ -116,18 +161,19 @@ class DatabaseManager:
         finally:
             conn.close()
     
-    def save_conversation(self, conversation, user_id):
+    def save_conversation(self, conversation, user_id, host=None):
         """
         Save a conversation to the database
         
         Args:
             conversation (dict): Conversation data
             user_id (str): User ID
+            host (str): The host domain from the request
             
         Returns:
             bool: Success or failure
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection(host)
         cursor = conn.cursor()
         now = datetime.now().isoformat()
         
@@ -169,18 +215,19 @@ class DatabaseManager:
         finally:
             conn.close()
     
-    def get_conversations(self, user_id, limit=50):
+    def get_conversations(self, user_id, limit=50, host=None):
         """
         Get conversations for a specific user
         
         Args:
             user_id (str): User ID
             limit (int): Maximum number of conversations to retrieve
+            host (str): The host domain from the request
             
         Returns:
             list: List of conversations
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection(host)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -212,18 +259,19 @@ class DatabaseManager:
         finally:
             conn.close()
     
-    def get_conversation(self, conversation_id, user_id):
+    def get_conversation(self, conversation_id, user_id, host=None):
         """
-        Get a specific conversation
+        Get a specific conversation by ID
         
         Args:
             conversation_id (str): Conversation ID
-            user_id (str): User ID for validation
+            user_id (str): User ID to validate ownership
+            host (str): The host domain from the request
             
         Returns:
             dict: Conversation data or None
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection(host)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -256,18 +304,19 @@ class DatabaseManager:
         finally:
             conn.close()
     
-    def delete_conversation(self, conversation_id, user_id):
+    def delete_conversation(self, conversation_id, user_id, host=None):
         """
         Delete a conversation and its messages
         
         Args:
             conversation_id (str): Conversation ID
             user_id (str): User ID for validation
+            host (str): The host domain from the request
             
         Returns:
             bool: Success or failure
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection(host)
         cursor = conn.cursor()
         
         try:
@@ -295,17 +344,18 @@ class DatabaseManager:
         finally:
             conn.close()
     
-    def clear_all_conversations(self, user_id):
+    def clear_all_conversations(self, user_id, host=None):
         """
         Delete all conversations for a user
         
         Args:
             user_id (str): User ID
+            host (str): The host domain from the request
             
         Returns:
             bool: Success or failure
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_connection(host)
         cursor = conn.cursor()
         
         try:

@@ -104,10 +104,29 @@ class ConfigManager:
         config = self.get_config()
         return config.get(section, {})
     
-    def get_value(self, section: str, key: str, default=None):
-        """Get a specific value from the configuration"""
-        section_config = self.get_section(section)
-        return section_config.get(key, default)
+    def get_value(self, section: str, key: str, default: Any = None) -> Any:
+        """Get a specific configuration value with default fallback"""
+        if self._config is None:
+            self.load_config()
+        
+        if section in self._config and key in self._config[section]:
+            return self._config[section][key]
+        return default
+        
+    def get_domain_config(self, host: str) -> Dict[str, Any]:
+        """Get domain-specific configuration for the given host
+        
+        Args:
+            host (str): The host domain from the request (e.g., ask.example.com)
+            
+        Returns:
+            Dict[str, Any]: Dictionary with domain-specific configuration or None
+        """
+        if self._config is None:
+            self.load_config()
+            
+        domain_mapping = self._config.get("domain_mapping", {})
+        return domain_mapping.get(host, None)
     
     def get_api_key(self) -> str:
         """Get the internal API key from configuration"""
