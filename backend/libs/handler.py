@@ -50,9 +50,14 @@ class SteamCustomHandler(BaseCallbackHandler):
             all_matches.append(citation_num)
         
         logging.info(f"All citation numbers found in response: {all_matches}")
+        
+        # If no citation numbers found, return empty list
+        if not all_matches:
+            return []
+            
         logging.info(f"Available citations range: 1 to {len(self._citations)}")
         
-        # Instead of filtering citations, return ALL available citations
+        # Return ALL available citations only when citations are referenced in the response
         # because the LLM was given access to all of them
         logging.info(f"Returning all {len(self._citations)} available citations (LLM had access to all)")
         
@@ -151,19 +156,27 @@ class SteamCustomHandler(BaseCallbackHandler):
         
         # Extract all available citations (no filtering)
         if self._citations and self._complete_response:
-            available_citations = self.extract_used_citations(self._complete_response)
+            # First check if any citations are actually referenced in the response
+            citation_pattern = r'\[(\d+)\]'
+            all_matches = [int(match.group(1)) for match in re.finditer(citation_pattern, self._complete_response)]
             
-            if available_citations:
-                import json
-                citation_data = {
-                    "type": "citations",
-                    "data": available_citations
-                }
-                logging.info(f"Sending {len(available_citations)} citations to frontend")
-                # Send the citation data object directly, not as JSON string
-                self._queue.put(citation_data)
+            # Only send citations if at least one citation number was found in the response
+            if all_matches:
+                available_citations = self.extract_used_citations(self._complete_response)
+                
+                if available_citations:
+                    import json
+                    citation_data = {
+                        "type": "citations",
+                        "data": available_citations
+                    }
+                    logging.info(f"Sending {len(available_citations)} citations to frontend")
+                    # Send the citation data object directly, not as JSON string
+                    self._queue.put(citation_data)
+                else:
+                    logging.info("No citations available")
             else:
-                logging.info("No citations available")
+                logging.info("No citation numbers found in response, not sending any citations")
         else:
             logging.warning("No citations available or no response generated")
         
