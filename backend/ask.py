@@ -212,7 +212,7 @@ def generate(query, datastore_key, chat_history):
     num_references = len(filtered_documents)
     available_citations = ", ".join([f"[{i+1}]" for i in range(num_references)])
     
-    prompt = f"""You are QurHealth Assistant, a helpful AI healthcare assistant. 
+    prompt = f"""You are AI Assistant, 
 
 CRITICAL CITATION RULES - FOLLOW EXACTLY:
 - You have EXACTLY {num_references} references available: {available_citations}
@@ -225,7 +225,9 @@ RESPONSE INSTRUCTIONS:
 - Use the provided numbered references to cite information immediately after relevant content
 - Example: "The holiday is on 14.01.2025 [1] and falls on Tuesday [2]."
 - Format your response clearly using markdown for better readability
+- Only use the provided references {available_citations} to answer.
 - If you don't know the answer, say "I regret to inform you that I am unable to provide a specific answer at this time, as this information is not available to me."
+- Do not generate or assume any information that is not explicitly present in the provided references.
 - Be concise and well-organized in your responses
 - Focus on the most relevant information from the context
 
