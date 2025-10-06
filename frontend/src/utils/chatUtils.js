@@ -10,11 +10,17 @@ export const addMessageToConversation = async (conversationId, message) => {
     console.log(`Adding message to conversation ${conversationId}:`, message);
     
     // Get the conversation
-    const conversation = await getConversation(conversationId);
+    let conversation = await getConversation(conversationId);
     
+    // If conversation doesn't exist in storage, create a new one with this ID
     if (!conversation) {
-      console.error(`Conversation ${conversationId} not found`);
-      throw new Error(`Conversation ${conversationId} not found`);
+      console.warn(`Conversation ${conversationId} not found in storage, creating it`);
+      conversation = {
+        id: conversationId,
+        title: 'New Conversation',
+        timestamp: new Date().toISOString(),
+        messages: []
+      };
     }
     
     // Add the message
@@ -35,11 +41,13 @@ export const addMessageToConversation = async (conversationId, message) => {
     conversation.updatedAt = new Date().toISOString();
     
     // Auto-generate title from first user message
-    if (conversation.messages.length === 1 && message.type === 'user') {
+    // This ensures conversation has a meaningful title from the first message
+    if ((conversation.messages.length === 0 || conversation.title === 'New Conversation') && message.type === 'user') {
       const title = message.content.length > 50 
         ? message.content.substring(0, 50) + '...' 
         : message.content;
       conversation.title = title;
+      console.log('Generated conversation title:', title);
     }
     
     console.log(`Saving conversation with ${conversation.messages.length} messages`);

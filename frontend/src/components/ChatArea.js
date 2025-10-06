@@ -75,7 +75,8 @@ const ChatArea = ({
     setMessages(prevMessages => [...prevMessages, userMessage]);
 
     try {
-      // Save the message to storage
+      // Always use addMessageToConversation for consistent handling of messages
+      // This ensures proper title generation and message formatting
       const updatedConversation = await addMessageToConversation(conversation.id, userMessage);
       if (updatedConversation) {
         onUpdateConversation(updatedConversation);
@@ -130,10 +131,10 @@ const ChatArea = ({
             setMessages(prevMessages => [...prevMessages, botMessage]);
 
             try {
-              // Then attempt to save to storage
-              const finalConversation = await addMessageToConversation(conversation.id, botMessage);
-              if (finalConversation) {
-                onUpdateConversation(finalConversation);
+              // Use addMessageToConversation to properly handle title generation and other logic
+              const updatedConversation = await addMessageToConversation(conversation.id, botMessage);
+              if (updatedConversation) {
+                onUpdateConversation(updatedConversation);
               }
             } catch (error) {
               console.error('Error saving bot message:', error);
@@ -169,6 +170,12 @@ const ChatArea = ({
           setTimeout(() => {
             setError(null);
           }, 5000);
+        },
+        // onCitations
+        (citations) => {
+          console.log('Received citations:', citations);
+          collectedCitations = citations;
+          setCurrentCitations(citations);
         },
         // onCitations
         (citations) => {

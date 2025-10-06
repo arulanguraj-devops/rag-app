@@ -279,14 +279,20 @@ class ServerStorageProvider extends StorageProvider {
         // Transform all conversations from server format to frontend format
         return response.conversations.map(serverConv => {
           // Transform messages for each conversation
-          const transformedMessages = (serverConv.messages || []).map(msg => ({
-            id: msg.id || String(Date.now()),
-            type: msg.role === 'user' ? 'user' : 'bot', // frontend expects 'type' not 'role'
-            content: msg.content,
-            timestamp: msg.timestamp,
-            // Preserve any citations that might be present
-            ...(msg.citations && { citations: msg.citations })
-          }));
+          const transformedMessages = (serverConv.messages || []).map(msg => {
+            // Determine the correct type based on role
+            // Default to 'bot' if role is 'assistant' or anything other than 'user'
+            const messageType = msg.role === 'user' ? 'user' : 'bot';
+            
+            return {
+              id: msg.id || String(Date.now()),
+              type: messageType,
+              content: msg.content,
+              timestamp: msg.timestamp,
+              // Preserve any citations that might be present
+              ...(msg.citations && { citations: msg.citations })
+            };
+          });
 
           // Return the formatted conversation
           return {
@@ -317,17 +323,21 @@ class ServerStorageProvider extends StorageProvider {
         // Transform the server conversation format back to frontend format
         const serverConv = response.conversation;
         
-        // Transform messages from server format to frontend format
-        const transformedMessages = serverConv.messages.map(msg => ({
-          id: msg.id || String(Date.now()),
-          type: msg.role === 'user' ? 'user' : 'bot', // frontend expects 'type' not 'role'
-          content: msg.content,
-          timestamp: msg.timestamp,
-          // Preserve any citations that might be present
-          ...(msg.citations && { citations: msg.citations })
-        }));
-
-        // Format the conversation object to match frontend expectations
+          // Transform messages from server format to frontend format
+        const transformedMessages = serverConv.messages.map(msg => {
+          // Determine the correct type based on role
+          // Default to 'bot' if role is 'assistant' or anything other than 'user'
+          const messageType = msg.role === 'user' ? 'user' : 'bot';
+          
+          return {
+            id: msg.id || String(Date.now()),
+            type: messageType,
+            content: msg.content,
+            timestamp: msg.timestamp,
+            // Preserve any citations that might be present
+            ...(msg.citations && { citations: msg.citations })
+          };
+        });        // Format the conversation object to match frontend expectations
         return {
           id: serverConv.id,
           title: serverConv.title,
@@ -353,16 +363,20 @@ class ServerStorageProvider extends StorageProvider {
 
       // Transform the frontend conversation format to match the backend API expectations
       const transformedMessages = conversation.messages.map(msg => {
+        // Convert type to role: 'user' stays 'user', everything else becomes 'assistant'
+        const role = msg.type === 'user' ? 'user' : 'assistant';
+        
         const transformed = {
           id: msg.id?.toString() || String(Date.now()),
           content: msg.content,
-          role: msg.type === 'user' ? 'user' : 'assistant', // backend expects 'role' not 'type'
+          role: role,
           timestamp: msg.timestamp
         };
         
         // Include citations if they exist
         if (msg.citations && Array.isArray(msg.citations)) {
           transformed.citations = msg.citations;
+          console.log(`Preserving ${msg.citations.length} citations for message ${transformed.id}`);
         }
         
         return transformed;

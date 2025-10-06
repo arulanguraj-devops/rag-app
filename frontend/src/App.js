@@ -86,8 +86,10 @@ function App() {
         // Create a fresh conversation for the new session
         const newConv = createNewConversation(null, null);
         
-        // Only save the new conversation in memory for now, don't persist it
-        // It will be saved once a message is sent
+        // Save the conversation immediately to avoid reference issues later
+        // We'll still filter it out when loading if it remains empty
+        await saveConversation(newConv);
+        console.log('Initial conversation saved with ID:', newConv.id);
         
         // Set the conversations list
         if (nonEmptyConversations.length === 0) {
