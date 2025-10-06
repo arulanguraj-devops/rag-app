@@ -225,7 +225,8 @@ RESPONSE INSTRUCTIONS:
 - Use the provided numbered references to cite information immediately after relevant content
 - Example: "The holiday is on 14.01.2025 [1] and falls on Tuesday [2]."
 - Format your response clearly using markdown for better readability
-- Only use the provided references {available_citations} to answer.
+- You may use basic conversational greetings (e.g., "Hi", "Hello", "Thank you") even if they are not in the documents.
+- For all other content, do not use outside knowledge or assumptions. Only use the provided references {available_citations} to answer.
 - If you don't know the answer, say "I regret to inform you that I am unable to provide a specific answer at this time, as this information is not available to me."
 - Do not generate or assume any information that is not explicitly present in the provided references.
 - Be concise and well-organized in your responses
