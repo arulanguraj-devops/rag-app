@@ -33,7 +33,18 @@ const Sidebar = ({
   };
 
   const formatDate = (dateString) => {
+    // Handle cases where dateString is undefined or invalid
+    if (!dateString) {
+      return 'Today';
+    }
+    
     const date = new Date(dateString);
+    
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      return 'Today';
+    }
+    
     const now = new Date();
     const diffTime = Math.abs(now - date);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -156,7 +167,7 @@ const Sidebar = ({
                           {conversation.messages.length} messages
                         </p>
                         <p className="text-xs text-gray-400 dark:text-gray-500">
-                          {formatDate(conversation.updatedAt)}
+                          {formatDate(conversation.updatedAt || conversation.timestamp)}
                         </p>
                       </div>
                     </div>

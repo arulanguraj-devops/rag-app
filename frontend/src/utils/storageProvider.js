@@ -577,10 +577,12 @@ export const generateConversationId = () => {
 };
 
 export const createNewConversation = (title = null, datastoreKey = null) => {
+  const now = new Date().toISOString();
   return {
     id: generateConversationId(),
     title: title || 'New Conversation',
-    timestamp: new Date().toISOString(),
+    timestamp: now,
+    updatedAt: now,
     messages: []
   };
 };
