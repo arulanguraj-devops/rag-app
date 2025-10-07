@@ -8,7 +8,7 @@
     "company_logo_url": "https://qurhealth.com/wp-content/uploads/2022/02/QurHealth_Logo.png",
     "chatbot_logo_url": "https://qurhealth.com/wp-content/uploads/2022/02/QurHealth_Logo.png",
     "support_email": "support@qurhealth.com",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "about": "Simple RAG application developed by QurHealth for internal use."
   },
   "features": {

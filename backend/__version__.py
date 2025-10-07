@@ -16,7 +16,7 @@ try:
 except ImportError:
     logging.basicConfig(level=logging.INFO)
 
-__version__ = "1.0.1"  # Version of the backend
+__version__ = "1.0.2"  # Version of the backend
 
 def get_config_version():
     """Get version from config.json"""
