@@ -20,11 +20,21 @@ const ChatArea = ({
   const [currentResponse, setCurrentResponse] = useState('');
   const [currentCitations, setCurrentCitations] = useState([]);
   const [error, setError] = useState(null);
+  const [hasReceivedLLMTitle, setHasReceivedLLMTitle] = useState(false);
+  const [currentConversation, setCurrentConversation] = useState(null);
+  const latestConversationRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   // Load messages when conversation changes
   useEffect(() => {
     console.log('Conversation change detected:', conversation?.id);
+    
+    // Reset title state when switching conversations
+    setHasReceivedLLMTitle(false);
+    
+    // Update local conversation state - always sync with the latest conversation prop
+    setCurrentConversation(conversation);
+    latestConversationRef.current = conversation;
     
     if (conversation?.messages) {
       console.log('Loading messages:', conversation.messages.map(m => ({ 
@@ -42,9 +52,9 @@ const ChatArea = ({
       console.log('No messages in conversation or conversation is null');
       setMessages([]);
     }
-  // Include conversation.messages in the dependency array to satisfy ESLint
+  // Include conversation itself in the dependency array to catch title updates
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation?.id, conversation?.messages]);
+  }, [conversation]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -77,8 +87,14 @@ const ChatArea = ({
     try {
       // Always use addMessageToConversation for consistent handling of messages
       // This ensures proper title generation and message formatting
-      const updatedConversation = await addMessageToConversation(conversation.id, userMessage);
+      // Pass the current conversation state to avoid fetching stale data from storage
+      const updatedConversation = await addMessageToConversation(conversation.id, userMessage, { 
+        expectingLLMTitle: !hasReceivedLLMTitle,
+        currentConversation: currentConversation
+      });
       if (updatedConversation) {
+        // Update local conversation state
+        setCurrentConversation(updatedConversation);
         onUpdateConversation(updatedConversation);
       }
     } catch (error) {
@@ -132,8 +148,16 @@ const ChatArea = ({
 
             try {
               // Use addMessageToConversation to properly handle title generation and other logic
-              const updatedConversation = await addMessageToConversation(conversation.id, botMessage);
+              // Use the latest conversation state from ref to avoid overwriting LLM title
+              const latestConversation = latestConversationRef.current || currentConversation;
+              const updatedConversation = await addMessageToConversation(conversation.id, botMessage, { 
+                expectingLLMTitle: !hasReceivedLLMTitle,
+                currentConversation: latestConversation
+              });
               if (updatedConversation) {
+                // Update local conversation state
+                setCurrentConversation(updatedConversation);
+                latestConversationRef.current = updatedConversation;
                 onUpdateConversation(updatedConversation);
               }
             } catch (error) {
@@ -177,11 +201,32 @@ const ChatArea = ({
           collectedCitations = citations;
           setCurrentCitations(citations);
         },
-        // onCitations
-        (citations) => {
-          console.log('Received citations:', citations);
-          collectedCitations = citations;
-          setCurrentCitations(citations);
+        // onTitle
+        async (title) => {
+          console.log('Received title from LLM:', title);
+          setHasReceivedLLMTitle(true);
+          
+          if (title && conversation) {
+            try {
+              // Update both local conversation state and parent state immediately
+              const updatedConversation = { ...currentConversation, title: title };
+              setCurrentConversation(updatedConversation);
+              latestConversationRef.current = updatedConversation;
+              onUpdateConversation(updatedConversation);
+              
+              // Save the updated conversation directly instead of just updating the title
+              const { saveConversation } = await import('../utils/storageProvider');
+              const success = await saveConversation(updatedConversation);
+              
+              if (success) {
+                console.log('Updated conversation title to:', title);
+              } else {
+                console.warn('Failed to save conversation with updated title');
+              }
+            } catch (error) {
+              console.error('Error updating conversation title:', error);
+            }
+          }
         }
       );
     } catch (error) {

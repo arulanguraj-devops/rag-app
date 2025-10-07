@@ -58,9 +58,17 @@ class DatabaseManager:
                 content TEXT,
                 role TEXT,
                 timestamp TIMESTAMP,
+                citations TEXT,
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id)
             )
             ''')
+            
+            # Check if citations column exists, if not add it (for existing databases)
+            cursor.execute("PRAGMA table_info(messages)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'citations' not in columns:
+                logger.info("Adding citations column to messages table")
+                cursor.execute("ALTER TABLE messages ADD COLUMN citations TEXT")
             
             conn.commit()
             conn.close()
@@ -155,9 +163,13 @@ class DatabaseManager:
             # Insert messages
             for message in conversation.get('messages', []):
                 msg_id = message.get('id', str(uuid.uuid4()))
+                citations_json = None
+                if message.get('citations'):
+                    citations_json = json.dumps(message['citations'])
+                
                 cursor.execute(
-                    "INSERT INTO messages (id, conversation_id, content, role, timestamp) VALUES (?, ?, ?, ?, ?)",
-                    (msg_id, conversation['id'], message['content'], message['role'], message.get('timestamp', now))
+                    "INSERT INTO messages (id, conversation_id, content, role, timestamp, citations) VALUES (?, ?, ?, ?, ?, ?)",
+                    (msg_id, conversation['id'], message['content'], message['role'], message.get('timestamp', now), citations_json)
                 )
             
             conn.commit()
@@ -197,12 +209,24 @@ class DatabaseManager:
                 # Get messages for this conversation
                 msg_cursor = conn.cursor()
                 msg_cursor.execute(
-                    "SELECT id, content, role, timestamp FROM messages "
+                    "SELECT id, content, role, timestamp, citations FROM messages "
                     "WHERE conversation_id = ? ORDER BY timestamp",
                     (conv['id'],)
                 )
                 
-                conv['messages'] = [dict(msg) for msg in msg_cursor.fetchall()]
+                messages = []
+                for msg in msg_cursor.fetchall():
+                    msg_dict = dict(msg)
+                    # Parse citations JSON if present
+                    if msg_dict.get('citations'):
+                        try:
+                            msg_dict['citations'] = json.loads(msg_dict['citations'])
+                        except json.JSONDecodeError:
+                            logger.warning(f"Failed to parse citations for message {msg_dict['id']}")
+                            msg_dict['citations'] = None
+                    messages.append(msg_dict)
+                
+                conv['messages'] = messages
                 conversations.append(conv)
             
             return conversations
@@ -243,12 +267,24 @@ class DatabaseManager:
             # Get messages
             msg_cursor = conn.cursor()
             msg_cursor.execute(
-                "SELECT id, content, role, timestamp FROM messages "
+                "SELECT id, content, role, timestamp, citations FROM messages "
                 "WHERE conversation_id = ? ORDER BY timestamp",
                 (conversation_id,)
             )
             
-            conversation['messages'] = [dict(msg) for msg in msg_cursor.fetchall()]
+            messages = []
+            for msg in msg_cursor.fetchall():
+                msg_dict = dict(msg)
+                # Parse citations JSON if present
+                if msg_dict.get('citations'):
+                    try:
+                        msg_dict['citations'] = json.loads(msg_dict['citations'])
+                    except json.JSONDecodeError:
+                        logger.warning(f"Failed to parse citations for message {msg_dict['id']}")
+                        msg_dict['citations'] = None
+                messages.append(msg_dict)
+            
+            conversation['messages'] = messages
             return conversation
         except Exception as e:
             logger.error(f"Error getting conversation {conversation_id}: {e}")

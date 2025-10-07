@@ -18,6 +18,10 @@ class SteamCustomHandler(BaseCallbackHandler):
         self._citations = []
         # Store the complete response to analyze citation usage
         self._complete_response = ""
+        # Buffer for handling title extraction during streaming
+        self._token_buffer = ""
+        self._title_processed = False
+        self._buffering = True  # Start buffering until we know if there's a title
         logging.info("Custom handler initialized with empty citations")  # Log initialization
         
     def set_citations(self, citations):
@@ -29,7 +33,34 @@ class SteamCustomHandler(BaseCallbackHandler):
         """Clear citations (useful for request isolation)"""
         self._citations = []
         self._complete_response = ""
+        self._token_buffer = ""
+        self._title_processed = False
+        self._buffering = True
         logging.info("Handler citations cleared")
+    
+    def extract_title_from_response(self, response_text):
+        """Extract title from LLM response and return cleaned response"""
+        try:
+            if not response_text:
+                return None, response_text
+                
+            # Check if response starts with title format
+            if response_text.startswith('TITLE: '):
+                lines = response_text.split('\n', 1)
+                title_line = lines[0]
+                title = title_line[7:].strip()  # Remove "TITLE: " prefix
+                
+                # Get the remaining response (everything after the title line)
+                clean_response = lines[1].strip() if len(lines) > 1 else ""
+                
+                logging.info(f"Extracted title: '{title}'")
+                return title, clean_response
+            else:
+                # No title found, return original response
+                return None, response_text
+        except Exception as e:
+            logging.warning(f"Error extracting title from response: {e}")
+            return None, response_text
     
     def extract_used_citations(self, response_text):
         """Extract all citations that match the available citation range"""
@@ -67,8 +98,50 @@ class SteamCustomHandler(BaseCallbackHandler):
     def on_llm_new_token(self, token: str, **kwargs) -> None:  
         # Collect the complete response for citation analysis
         self._complete_response += token
-        # Send token as-is - we'll handle invalid citations in the extraction phase
-        self._queue.put(token)
+        
+        if self._buffering and not self._title_processed:
+            # Buffer tokens until we can determine if there's a title
+            self._token_buffer += token
+            
+            # Check if we have enough content to determine if there's a title
+            # Wait for at least one newline AND some content after it, or buffer is getting long
+            if (('\n' in self._token_buffer and len(self._token_buffer.split('\n', 1)) > 1 and 
+                 len(self._token_buffer.split('\n', 1)[1].strip()) > 0) or 
+                len(self._token_buffer) > 100):
+                
+                # Process the buffer to check for title
+                title, clean_content = self.extract_title_from_response(self._token_buffer)
+                
+                if title:
+                    # Found title - send it separately and start streaming clean content
+                    logging.info(f"Title detected during streaming: '{title}'")
+                    title_data = {
+                        "type": "title",
+                        "data": title
+                    }
+                    logging.info(f"Sending title data to queue: {title_data}")
+                    self._queue.put(title_data)
+                    
+                    # Stream the clean content (after title line)
+                    if clean_content:
+                        logging.info(f"Sending clean content: '{clean_content[:50]}...'")
+                        self._queue.put(clean_content)
+                    
+                    self._title_processed = True
+                    self._buffering = False
+                    self._token_buffer = ""
+                else:
+                    # No title found - stream the buffered content and continue normal streaming
+                    self._queue.put(self._token_buffer)
+                    self._title_processed = True
+                    self._buffering = False
+                    self._token_buffer = ""
+                    self._buffering = False
+                    self._token_buffer = ""
+        else:
+            # Normal streaming after title processing is complete
+            self._queue.put(token)
+        
         logging.debug(f"New token received: {token}")  # Log the received token
     
     def clean_invalid_citations_from_complete_response(self, response_text):
@@ -153,6 +226,23 @@ class SteamCustomHandler(BaseCallbackHandler):
                 logging.info("Cleaned invalid citations from response")
                 # Update the stored response with the cleaned version
                 self._complete_response = cleaned_response
+        
+        # Extract title from response (only if not already processed during streaming)
+        if self._complete_response and not self._title_processed:
+            title, clean_response = self.extract_title_from_response(self._complete_response)
+            if title:
+                # Update the stored response without the title line
+                self._complete_response = clean_response
+                
+                # Send title to frontend
+                title_data = {
+                    "type": "title",
+                    "data": title
+                }
+                logging.info(f"Sending conversation title at end: '{title}'")
+                self._queue.put(title_data)
+        elif self._title_processed:
+            logging.info("Title already processed during streaming, skipping duplicate send")
         
         # Extract all available citations (no filtering)
         if self._citations and self._complete_response:

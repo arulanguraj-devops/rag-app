@@ -42,7 +42,7 @@ export class APIError extends Error {
   }
 }
 
-export const streamChatResponse = async (query, chat_history, apiKey, onMessage, onComplete, onError, onCitations = () => {}) => {
+export const streamChatResponse = async (query, chat_history, apiKey, onMessage, onComplete, onError, onCitations = () => {}, onTitle = () => {}) => {
   try {
     const headers = {
       'Content-Type': 'application/json'
@@ -97,6 +97,9 @@ export const streamChatResponse = async (query, chat_history, apiKey, onMessage,
               } else if (data.type === 'citations' && data.data) {
                 console.log('Received citations from backend:', data.data);
                 onCitations(data.data);
+              } else if (data.type === 'title' && data.data) {
+                console.log('Received title from backend:', data.data);
+                onTitle(data.data);
               } else if (data.type === 'correction' && data.data) {
                 console.log('Received corrected response from backend');
                 // Signal to replace the current response with the corrected one

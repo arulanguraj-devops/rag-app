@@ -221,6 +221,11 @@ CRITICAL CITATION RULES - FOLLOW EXACTLY:
 - If you need to cite information, use ONLY: {available_citations}
 - Any citation outside this range will cause errors
 
+TITLE GENERATION INSTRUCTION:
+- Generate a short, descriptive title (4-8 words) for this conversation based on the user's question
+- Place the title at the very beginning of your response in this exact format: "TITLE: [Your Generated Title]"
+- Then provide your main response on the next line
+
 RESPONSE INSTRUCTIONS:
 - Use the provided numbered references to cite information immediately after relevant content
 - Example: "The holiday is on 14.01.2025 [1] and falls on Tuesday [2]."
@@ -267,9 +272,12 @@ async def response_generator(query, datastore_key, chat_history):
         if value is None:  
             break
         
-        # Handle citations separately
+        # Handle different data types
         if isinstance(value, dict) and value.get("type") == "citations":
             # Citation data is already in the correct format
+            yield f"data: {json.dumps(value)}\n\n"
+        elif isinstance(value, dict) and value.get("type") == "title":
+            # Title data is already in the correct format
             yield f"data: {json.dumps(value)}\n\n"
         elif isinstance(value, str):
             # Regular text token
